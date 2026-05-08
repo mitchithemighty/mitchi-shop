@@ -1,11 +1,5 @@
-"use client"
+"use client";
 import { useState, useRef, useEffect } from "react";
-
-// ── FONTS ─────────────────────────────────────────────────────────────────────
-const fl = document.createElement("link");
-fl.rel = "stylesheet";
-fl.href = "https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Nunito+Sans:wght@400;600;700&display=swap";
-document.head.appendChild(fl);
 
 // ── PALETTE — gouache illustration ────────────────────────────────────────────
 const P = {
