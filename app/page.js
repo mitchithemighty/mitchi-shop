@@ -1001,6 +1001,181 @@ function Report({ services }) {
   );
 }
 
+
+// ── SERVICE MANAGER — full CRUD editable on app ───────────────────────────────
+const ICOS = ["💜","⭐","🌙","✨","🔮","🌟","🌸","🦋","🌈","🎴","🃏","🌊","🔥","💫","🌺","🐸"];
+const emptyS = { name:"", ico:"💜", type:"per_q", price:"", price6:"", dur:"60", active:true };
+
+function ServiceManager({ services, setServices, toast }) {
+  const [modal, setModal] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(emptyS);
+  const [delConfirm, setDelConfirm] = useState(null);
+
+  const openNew = () => { setForm(emptyS); setEditing(null); setModal(true); };
+  const openEdit = (s) => {
+    setForm({ name:s.name, ico:s.ico, type:s.type, price:String(s.price), price6:String(s.price6||""), dur:String(s.dur||60), active:s.active });
+    setEditing(s.id); setModal(true);
+  };
+  const save = () => {
+    if (!form.name.trim()) { toast("⚠️ Nhập tên dịch vụ!"); return; }
+    if (!form.price) { toast("⚠️ Nhập giá!"); return; }
+    const updated = { ...form, price:Number(form.price), price6:Number(form.price6)||0, dur:Number(form.dur)||60 };
+    if (editing) {
+      setServices(p=>p.map(s=>s.id===editing ? {...s,...updated} : s));
+      toast("✅ Đã cập nhật dịch vụ!");
+    } else {
+      setServices(p=>[...p, { id:Date.now(), ...updated, sold:0 }]);
+      toast("✅ Đã thêm dịch vụ mới!");
+    }
+    setModal(false);
+  };
+  const del = (id) => { setServices(p=>p.filter(s=>s.id!==id)); setDelConfirm(null); toast("🗑 Đã xoá dịch vụ!"); };
+  const toggle = (id) => setServices(p=>p.map(s=>s.id===id?{...s,active:!s.active}:s));
+
+  const p1 = Number(form.price)||0;
+  const p6 = Number(form.price6)||p1;
+
+  return (
+    <>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:12,color:P.muted,textTransform:"uppercase",letterSpacing:1}}>
+          Dịch vụ ({services.length})
+        </div>
+        <button className="btn-xs btn btn-g" onClick={openNew}>+ Thêm dịch vụ</button>
+      </div>
+
+      {services.length===0 && (
+        <div style={{textAlign:"center",padding:"24px 16px",color:P.muted,fontSize:13,fontWeight:700}}>
+          Chưa có dịch vụ nào · Nhấn + Thêm để bắt đầu
+        </div>
+      )}
+
+      {services.map(s=>(
+        <div key={s.id} style={{background:P.card,borderRadius:15,border:`2px solid ${P.ink}`,boxShadow:`3px 3px 0 ${P.ink}`,padding:"12px 14px",marginBottom:9}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:40,height:40,borderRadius:12,border:`2px solid ${P.ink}`,boxShadow:`2px 2px 0 ${P.ink}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0,background:P.cloud,opacity:s.active?1:0.5}}>
+              {s.ico}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:14,fontWeight:700,color:s.active?P.ink:P.muted}}>{s.name}</div>
+              <div style={{fontSize:11,fontWeight:600,color:P.muted,marginTop:2}}>
+                {s.type==="fixed"
+                  ? vnd(s.price)
+                  : `${(s.price/1000).toFixed(0)}k/câu (1–5)${s.price6?` · ${(s.price6/1000).toFixed(0)}k/câu (6+)`:""}`
+                }
+                {s.dur ? ` · ${s.dur} phút` : ""}
+              </div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+              <button onClick={()=>openEdit(s)}
+                style={{width:32,height:32,borderRadius:8,border:`2px solid ${P.ink}`,background:P.yellowbg,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                ✏️
+              </button>
+              <button onClick={()=>setDelConfirm(delConfirm===s.id?null:s.id)}
+                style={{width:32,height:32,borderRadius:8,border:`2px solid ${P.ink}`,background:"#FFE4E4",cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                🗑
+              </button>
+              <button className={`tog ${s.active?"on":"off"}`} onClick={()=>toggle(s.id)}/>
+            </div>
+          </div>
+          {delConfirm===s.id && (
+            <div style={{marginTop:10,background:"#FFE4E4",borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",border:`1.5px solid ${P.red}`}}>
+              <span style={{fontSize:12,fontWeight:700,color:P.red}}>Xoá "{s.name}"?</span>
+              <div style={{display:"flex",gap:6}}>
+                <button className="btn-xs btn" style={{background:P.red,color:"#fff",borderColor:P.ink}} onClick={()=>del(s.id)}>Xoá luôn</button>
+                <button className="btn-xs btn btn-gh" onClick={()=>setDelConfirm(null)}>Huỷ</button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {modal && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
+          <div className="sheet">
+            <div className="drag"/>
+            <div className="modal-h">{editing?"Sửa dịch vụ ✏️":"Thêm dịch vụ 🐸"}</div>
+
+            <div className="f">
+              <label>Chọn icon</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:7,marginTop:4}}>
+                {ICOS.map(ic=>(
+                  <button key={ic} onClick={()=>setForm(p=>({...p,ico:ic}))}
+                    style={{width:38,height:38,borderRadius:10,fontSize:19,border:`2.5px solid ${form.ico===ic?P.ink:P.border}`,background:form.ico===ic?P.yellow:P.card,cursor:"pointer",boxShadow:form.ico===ic?`2px 2px 0 ${P.ink}`:"none",transition:"all .1s"}}>
+                    {ic}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="f">
+              <label>Tên dịch vụ</label>
+              <input placeholder="VD: Tarot Tình Yêu" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))}/>
+            </div>
+
+            <div className="f">
+              <label>Loại giá</label>
+              <div style={{display:"flex",gap:8}}>
+                {[{k:"per_q",l:"💬 Theo câu"},{k:"fixed",l:"📦 Trọn gói"}].map(t=>(
+                  <button key={t.k} onClick={()=>setForm(p=>({...p,type:t.k}))}
+                    style={{flex:1,padding:"11px",borderRadius:12,border:`2.5px solid ${form.type===t.k?P.ink:P.border}`,background:form.type===t.k?P.yellow:P.card,fontFamily:"Nunito",fontWeight:800,fontSize:13,cursor:"pointer",boxShadow:form.type===t.k?`2px 2px 0 ${P.ink}`:"none",transition:"all .12s"}}>
+                    {t.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {form.type==="per_q" ? (
+              <>
+                <div className="f">
+                  <label>Giá câu 1–5 (VND/câu)</label>
+                  <input type="number" placeholder="20000" value={form.price} onChange={e=>setForm(p=>({...p,price:e.target.value}))}/>
+                </div>
+                <div className="f">
+                  <label>Giá câu 6+ (VND/câu) — để trống = cùng giá câu 1–5</label>
+                  <input type="number" placeholder="15000" value={form.price6} onChange={e=>setForm(p=>({...p,price6:e.target.value}))}/>
+                </div>
+                {form.price && (
+                  <div className="box box-greenbg" style={{marginBottom:12}}>
+                    <div style={{fontSize:10,fontWeight:800,color:P.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Xem trước tính tiền tự động</div>
+                    {[3,5,7,10,15].map(q=>{
+                      const amt = q<=5 ? q*p1 : 5*p1+(q-5)*p6;
+                      return (
+                        <div key={q} style={{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700,padding:"5px 0",borderBottom:`1px dashed ${P.border}`}}>
+                          <span style={{color:P.muted}}>{q} câu</span>
+                          <span style={{color:P.green,fontFamily:"Nunito",fontWeight:900}}>{vnd(amt)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="f">
+                <label>Giá trọn gói (VND)</label>
+                <input type="number" placeholder="100000" value={form.price} onChange={e=>setForm(p=>({...p,price:e.target.value}))}/>
+              </div>
+            )}
+
+            <div className="f">
+              <label>Thời lượng (phút)</label>
+              <input type="number" placeholder="60" value={form.dur} onChange={e=>setForm(p=>({...p,dur:e.target.value}))}/>
+            </div>
+
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              <button className="btn btn-g" style={{flex:2}} onClick={save}>
+                {editing?"💾 Lưu thay đổi":"➕ Thêm dịch vụ"}
+              </button>
+              <button className="btn btn-gh" style={{flex:1}} onClick={()=>setModal(false)}>Huỷ</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
 function Settings({ logout, toast, services, setServices }) {
   return (
@@ -1011,20 +1186,9 @@ function Settings({ logout, toast, services, setServices }) {
         <div className="hdr-h1">Cài Đặt</div>
       </div>
       <div className="sec">
-        <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:12,color:P.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Dịch vụ đang bán</div>
-        {services.map(s=>(
-          <div key={s.id} className="row" style={{cursor:"default"}}>
-            <div className="ava" style={{background:P.cloud,fontSize:20}}>{s.ico}</div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:14,fontWeight:700}}>{s.name}</div>
-              <div style={{fontSize:11,fontWeight:600,color:P.muted}}>{s.type==="fixed"?vnd(s.price):`${s.price/1000}k/câu`} · {s.dur} phút</div>
-            </div>
-            <button className={`tog ${s.active?"on":"off"}`}
-              onClick={()=>setServices(p=>p.map(x=>x.id===s.id?{...x,active:!x.active}:x))}/>
-          </div>
-        ))}
+        <ServiceManager services={services} setServices={setServices} toast={toast}/>
 
-        <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:12,color:P.muted,textTransform:"uppercase",letterSpacing:1,margin:"18px 0 8px"}}>Shop & tài khoản</div>
+        <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:12,color:P.muted,textTransform:"uppercase",letterSpacing:1,margin:"20px 0 8px"}}>Shop & tài khoản</div>
         {[
           {ico:"🏪",t:"Thông tin shop",     s:"Mitchi Tarot · Tên, logo, mô tả"},
           {ico:"💳",t:"Tài khoản ngân hàng",s:"ACB · Vietcombank"},
@@ -1047,6 +1211,7 @@ function Settings({ logout, toast, services, setServices }) {
     </div>
   );
 }
+
 
 // ── ROOT APP ──────────────────────────────────────────────────────────────────
 const NAV = [
