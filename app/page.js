@@ -578,83 +578,199 @@ function OrderDetail({order, customers, services, onUpdate, onClose, toast}) {
   );
 }
 
-// ── INVOICE VIEW ──────────────────────────────────────────────────────────────
+// ── INVOICE VIEW — styled như mẫu navy/cam của Mitchi ────────────────────────
+const INV_NAVY = "#0D1B3E";
+const INV_RED  = "#C0392B";
+const INV_GOLD = "#E8C97A";
+
 function InvoiceView({order, cust, services, toast, onClose}) {
   const [qr, setQr] = useState("acb");
+
+  // Build invoice rows
+  const rows = [];
+  order.items.forEach(it => {
+    const svc = services.find(s=>s.id===it.svcId);
+    if (!svc) return;
+    if (svc.type==="fixed") {
+      rows.push({ qty:1, desc:svc.name, unitPrice:svc.price, total:svc.price, group:it.group });
+    } else {
+      const q = parseInt(it.qty)||0;
+      if (q<=5) {
+        rows.push({ qty:q, desc:`${svc.name} (trong 5 câu đầu)`, unitPrice:svc.price, total:q*svc.price, group:it.group });
+        rows.push({ qty:0, desc:`${svc.name} (từ câu 6 trở đi)`, unitPrice:svc.price6||svc.price, total:0, group:"" });
+      } else {
+        rows.push({ qty:5, desc:`${svc.name} (trong 5 câu đầu)`, unitPrice:svc.price, total:5*svc.price, group:it.group });
+        rows.push({ qty:q-5, desc:`${svc.name} (từ câu 6 trở đi)`, unitPrice:svc.price6||svc.price, total:(q-5)*(svc.price6||svc.price), group:"" });
+      }
+    }
+  });
+  if (order.extraQ>0) {
+    const eq=parseInt(order.extraQ);
+    if(eq<=5) {
+      rows.push({qty:eq,desc:"Câu hỏi lẻ (trong 5 câu đầu)",unitPrice:20000,total:eq*20000,group:""});
+    } else {
+      rows.push({qty:5,desc:"Câu hỏi lẻ (trong 5 câu đầu)",unitPrice:20000,total:100000,group:""});
+      rows.push({qty:eq-5,desc:"Câu hỏi lẻ (từ câu 6 trở đi)",unitPrice:15000,total:(eq-5)*15000,group:""});
+    }
+  }
+
+  const copyText = () => {
+    const lines = rows.map(r=>`${r.qty > 0 ? r.qty : 0} | ${r.desc} | ${vnd(r.unitPrice)} | ${vnd(r.total)}`).join("\n");
+    const txt = `🧾 HOÁ ĐƠN TẠM TÍNH — MITCHI THE MIGHTY\nNgày: ${order.date} ${order.time}\nKhách: ${cust?.name}\n\n${lines}\n\nTỔNG: ${vnd(order.total)}\n\nNgân hàng: ${qr==="acb"?"ACB (Á Châu)\nSố TK: 6205237\nTên chủ: TON NU HONG CHAU":"Vietcombank\nSố TK: ...\nTên chủ: TON NU HONG CHAU"}\n\nXIN CẢM ƠN QUÝ KHÁCH — HẸN GẶP LẠI!`;
+    navigator.clipboard?.writeText(txt);
+    toast("📋 Đã copy text hóa đơn!");
+  };
+
   return(
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="sheet">
-        <div className="drag"/>
-        <div className="mh">🧾 Hóa Đơn</div>
-        <div className="inv">
-          <div className="inv-hdr">
-            <div style={{fontSize:32,marginBottom:4}}>🐸</div>
-            <div style={{fontFamily:"Nunito",fontSize:20,fontWeight:900,color:P.ink}}>Mitchi Tarot</div>
-            <div style={{fontSize:11,fontWeight:700,color:P.inkmid}}>{order.date} · {order.time}</div>
-          </div>
-          <div className="inv-body">
-            <div className="inv-row">
-              <span style={{fontSize:12,fontWeight:700,color:P.muted}}>Khách hàng</span>
-              <span style={{fontSize:13,fontWeight:700}}>{cust?.name}</span>
-            </div>
-            {order.items.map((it,i)=>{
-              const svc=services.find(s=>s.id===it.svcId);
-              if(!svc) return null;
-              const amt=svc.type==="fixed"?svc.price:calcQ(it.qty,svc.price,svc.price6);
-              return(
-                <div key={i} className="inv-row">
-                  <span style={{fontSize:12,fontWeight:700,color:P.muted}}>
-                    {svc.ico} {svc.name}{svc.type==="per_q"?` (${it.qty} câu)`:""}
-                    {it.group&&<span style={{display:"block",fontSize:10,color:P.muted}}>📌 {it.group}</span>}
-                  </span>
-                  <span style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:P.green}}>{vnd(amt)}</span>
-                </div>
-              );
-            })}
-            {order.extraQ>0&&(
-              <div className="inv-row">
-                <span style={{fontSize:12,fontWeight:700,color:P.muted}}>💬 {order.extraQ} câu lẻ thêm</span>
-                <span style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:P.orange}}>{vnd(calcQ(order.extraQ,20000,15000))}</span>
-              </div>
-            )}
-            <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0 4px",borderTop:`2.5px solid ${P.ink}`}}>
-              <span style={{fontFamily:"Nunito",fontWeight:900,fontSize:14}}>TỔNG CỘNG</span>
-              <span style={{fontFamily:"Nunito",fontWeight:900,fontSize:22,color:P.green}}>{vnd(order.total)}</span>
+      <div className="sheet" style={{background:"#0a1628"}}>
+        <div className="drag" style={{background:"rgba(255,255,255,.2)",borderColor:"rgba(255,255,255,.3)"}}/>
+
+        {/* ── HÓA ĐƠN TEMPLATE ── */}
+        <div id="invoice-render" style={{
+          background:`linear-gradient(160deg, #0D1B3E 0%, #1a2d5a 100%)`,
+          borderRadius:16, overflow:"hidden", position:"relative",
+          border:"2px solid rgba(232,201,122,0.3)",
+        }}>
+          {/* Decorative dots top */}
+          <div style={{height:6,background:`repeating-linear-gradient(90deg,${INV_GOLD} 0,${INV_GOLD} 4px,transparent 4px,transparent 12px)`,opacity:.6}}/>
+
+          {/* Header */}
+          <div style={{padding:"20px 20px 16px",textAlign:"center",position:"relative"}}>
+            {/* Corner decorations */}
+            <div style={{position:"absolute",top:12,left:12,fontSize:18,color:INV_GOLD,opacity:.7}}>✦</div>
+            <div style={{position:"absolute",top:12,right:12,fontSize:18,color:INV_GOLD,opacity:.7}}>✦</div>
+
+            {/* Logo */}
+            <div style={{marginBottom:8}}>
+              <img src="/images/logo.jpg" alt="Mitchi Logo"
+                style={{width:70,height:70,objectFit:"contain",borderRadius:"50%",border:`2px solid ${INV_GOLD}`,background:"rgba(255,255,255,.05)"}}
+                onError={e=>{e.target.style.display="none";}}/>
             </div>
 
-            {/* QR selector */}
-            <div style={{marginTop:12}}>
-              <div style={{fontSize:11,fontWeight:800,color:P.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Ngân hàng QR</div>
-              <div style={{display:"flex",gap:8,marginBottom:12}}>
-                {["acb","vcb"].map(b=>(
-                  <button key={b} onClick={()=>setQr(b)}
-                    style={{flex:1,padding:10,borderRadius:12,border:`2.5px solid ${qr===b?P.ink:P.border}`,background:qr===b?P.yellow:P.card,fontFamily:"Nunito",fontWeight:800,fontSize:13,cursor:"pointer",boxShadow:qr===b?`2px 2px 0 ${P.ink}`:"none"}}>
-                    {b==="acb"?"🏦 ACB":"🏦 VCB"}
-                  </button>
-                ))}
+            <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:18,color:"#fff",letterSpacing:2,textTransform:"uppercase",marginBottom:2}}>
+              MITCHI THE MIGHTY
+            </div>
+            <div style={{fontSize:11,color:INV_GOLD,fontStyle:"italic",marginBottom:12,letterSpacing:1}}>
+              Tarot and Lenormand Reader
+            </div>
+
+            {/* Dotted divider */}
+            <div style={{borderTop:`1.5px dotted rgba(232,201,122,0.4)`,margin:"0 0 10px"}}/>
+
+            <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:22,color:"#fff",letterSpacing:1,marginBottom:12}}>
+              HOÁ ĐƠN TẠM TÍNH
+            </div>
+
+            {/* Date pill */}
+            <div style={{display:"inline-block",background:INV_RED,borderRadius:50,padding:"7px 20px",fontSize:13,fontWeight:700,color:"#fff",letterSpacing:.5}}>
+              Ngày: {order.date} {order.time}
+            </div>
+
+            {/* Moon decorations */}
+            <div style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",fontSize:28,opacity:.25}}>🌙</div>
+            <div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:22,opacity:.2}}>🌙</div>
+          </div>
+
+          {/* Dotted divider */}
+          <div style={{borderTop:`1.5px dotted rgba(232,201,122,0.3)`,margin:"0 20px 14px"}}/>
+
+          {/* Customer */}
+          <div style={{margin:"0 16px 12px",background:"rgba(255,255,255,.08)",borderRadius:10,padding:"8px 14px",border:"1px solid rgba(232,201,122,0.2)"}}>
+            <span style={{fontSize:14,fontWeight:800,color:"#fff"}}>Khách: {cust?.name}</span>
+          </div>
+
+          {/* Table */}
+          <div style={{margin:"0 16px 16px",borderRadius:10,overflow:"hidden",border:`1px solid rgba(232,201,122,0.2)`}}>
+            {/* Table header */}
+            <div style={{display:"grid",gridTemplateColumns:"48px 1fr 80px 80px",background:INV_RED,padding:"10px 12px",gap:4}}>
+              {["Số câu","Mô tả sản phẩm","Giá","Tổng"].map(h=>(
+                <div key={h} style={{fontSize:11,fontWeight:800,color:"#fff",fontStyle:"italic",textAlign:h==="Số câu"?"center":"left"}}>{h}</div>
+              ))}
+            </div>
+            {/* Table rows */}
+            {rows.map((r,i)=>(
+              <div key={i} style={{display:"grid",gridTemplateColumns:"48px 1fr 80px 80px",padding:"9px 12px",gap:4,background:i%2===0?"rgba(255,255,255,.04)":"rgba(255,255,255,.02)",borderTop:"1px solid rgba(232,201,122,.1)"}}>
+                <div style={{textAlign:"center",fontFamily:"Nunito",fontWeight:900,fontSize:15,color:r.total>0?INV_RED:"rgba(255,255,255,.4)"}}>{r.qty}</div>
+                <div>
+                  <div style={{fontSize:12,fontWeight:600,color:"#fff"}}>{r.desc}</div>
+                  {r.group&&<div style={{fontSize:10,color:INV_GOLD,marginTop:2}}>📌 {r.group}</div>}
+                </div>
+                <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.7)"}}>{vnd(r.unitPrice)}</div>
+                <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:13,color:r.total>0?"#fff":"rgba(255,255,255,.3)"}}>{vnd(r.total)}</div>
               </div>
-              <div style={{background:P.bg,borderRadius:12,border:`2px solid ${P.ink}`,padding:14,textAlign:"center"}}>
-                <div style={{fontSize:56,marginBottom:6}}>📱</div>
-                <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:13}}>{qr==="acb"?"ACB – Nguyễn Thị Mitchi":"Vietcombank – Nguyễn Thị Mitchi"}</div>
-                <div style={{fontSize:11,fontWeight:700,color:P.muted,marginTop:4}}>Quét mã QR để chuyển khoản</div>
+            ))}
+            {/* Total row */}
+            <div style={{display:"grid",gridTemplateColumns:"48px 1fr 80px 80px",padding:"10px 12px",gap:4,background:"rgba(192,57,43,.15)",borderTop:`2px solid rgba(232,201,122,.3)`}}>
+              <div/>
+              <div/>
+              <div style={{fontSize:13,fontWeight:900,color:INV_GOLD,textAlign:"right",paddingRight:8}}>Tổng</div>
+              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:INV_RED}}>{vnd(order.total)}</div>
+            </div>
+          </div>
+
+          {/* QR + Bank info */}
+          <div style={{margin:"0 16px 16px",background:"rgba(255,255,255,.07)",borderRadius:12,border:"1px solid rgba(232,201,122,.2)",padding:14,display:"flex",gap:14,alignItems:"center"}}>
+            {/* QR image */}
+            <div style={{flexShrink:0}}>
+              <img src={qr==="acb"?"/images/qr-acb.jpg":"/images/qr-vcb.jpg"}
+                alt="QR" style={{width:90,height:90,borderRadius:10,objectFit:"cover",border:`2px solid ${INV_GOLD}`}}
+                onError={e=>{e.target.outerHTML=`<div style="width:90px;height:90px;background:rgba(255,255,255,.1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:32px;border:2px solid ${INV_GOLD}">📱</div>`;}}/>
+              <div style={{display:"flex",gap:4,marginTop:6,alignItems:"center",justifyContent:"center"}}>
+                <div style={{fontSize:9,fontWeight:700,color:"#1565C0",background:"#fff",borderRadius:4,padding:"2px 5px"}}>VIETQR</div>
+                <div style={{fontSize:9,fontWeight:700,color:INV_RED,background:"#fff",borderRadius:4,padding:"2px 5px"}}>napas 247</div>
               </div>
             </div>
-            <div style={{textAlign:"center",fontSize:12,fontWeight:700,color:P.muted,padding:"10px 0 4px"}}>🐸 Cảm ơn bạn đã tin tưởng Mitchi Tarot! 🐸</div>
+            {/* Bank info */}
+            <div>
+              <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:4}}>
+                Ngân hàng: {qr==="acb"?"ACB (Á Châu)":"Vietcombank"}
+              </div>
+              <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.8)",marginBottom:3}}>
+                Số tài khoản: {qr==="acb"?"6205237":"—"}
+              </div>
+              <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.8)"}}>
+                Tên chủ: TON NU HONG CHAU
+              </div>
+            </div>
           </div>
+
+          {/* Dotted divider */}
+          <div style={{borderTop:`1.5px dotted rgba(232,201,122,0.3)`,margin:"0 20px 12px"}}/>
+
+          {/* Footer */}
+          <div style={{textAlign:"center",padding:"4px 20px 16px"}}>
+            <div style={{fontSize:13,fontWeight:900,color:"#fff",letterSpacing:2,textTransform:"uppercase",marginBottom:2}}>XIN CẢM ƠN QUÝ KHÁCH</div>
+            <div style={{fontSize:13,fontWeight:900,color:"#fff",letterSpacing:2,textTransform:"uppercase",marginBottom:8}}>HẸN GẶP LẠI</div>
+            <div style={{fontSize:16,opacity:.4}}>✦ ✦ ✦</div>
+          </div>
+
+          {/* Decorative dots bottom */}
+          <div style={{height:6,background:`repeating-linear-gradient(90deg,${INV_GOLD} 0,${INV_GOLD} 4px,transparent 4px,transparent 12px)`,opacity:.6}}/>
         </div>
-        <div style={{height:12}}/>
+
+        {/* QR switcher */}
+        <div style={{display:"flex",gap:8,margin:"14px 0 10px"}}>
+          {["acb","vcb"].map(b=>(
+            <button key={b} onClick={()=>setQr(b)}
+              style={{flex:1,padding:10,borderRadius:12,border:`2.5px solid ${qr===b?INV_GOLD:"rgba(255,255,255,.2)"}`,background:qr===b?"rgba(232,201,122,.15)":"transparent",fontFamily:"Nunito",fontWeight:800,fontSize:13,cursor:"pointer",color:qr===b?INV_GOLD:"rgba(255,255,255,.6)",transition:"all .15s"}}>
+              {b==="acb"?"🏦 ACB":"🏦 Vietcombank"}
+            </button>
+          ))}
+        </div>
+
+        {/* Action buttons */}
         <div style={{display:"flex",gap:8,marginBottom:8}}>
-          <button className="btn btn-y" style={{flex:1}} onClick={()=>toast("📸 Đã xuất PNG!")}>📸 PNG</button>
-          <button className="btn btn-g" style={{flex:1}} onClick={()=>toast("📄 Đã xuất PDF!")}>📄 PDF</button>
+          <button className="btn" style={{flex:1,background:INV_RED,color:"#fff",border:`2.5px solid ${INV_GOLD}`,boxShadow:`3px 3px 0 rgba(232,201,122,.4)`}}
+            onClick={()=>toast("📸 Tính năng xuất PNG — cần html2canvas, sắp ra mắt!")}>
+            📸 Xuất PNG
+          </button>
+          <button className="btn" style={{flex:1,background:"rgba(255,255,255,.1)",color:"#fff",border:`2.5px solid rgba(255,255,255,.3)`,boxShadow:"none"}}
+            onClick={copyText}>
+            📋 Copy text
+          </button>
         </div>
-        <button className="btn btn-s" onClick={()=>{
-          const lines=order.items.map(it=>{const svc=services.find(s=>s.id===it.svcId);return svc?`${svc.ico} ${svc.name}${svc.type==="per_q"?` (${it.qty} câu)`:""}: ${svc.type==="fixed"?vnd(svc.price):vnd(calcQ(it.qty,svc.price,svc.price6))}`:""}).filter(Boolean).join("\n");
-          const txt=`🧾 HÓA ĐƠN MITCHI TAROT\n📅 ${order.date} · ${order.time}\n👤 ${cust?.name}\n\n${lines}${order.extraQ>0?`\n💬 ${order.extraQ} câu lẻ: ${vnd(calcQ(order.extraQ,20000,15000))}`:""}`;
-          navigator.clipboard?.writeText(txt+`\n\n💰 TỔNG: ${vnd(order.total)}\n🏦 ${qr==="acb"?"ACB":"VCB"} – Nguyễn Thị Mitchi\n\n🐸 Cảm ơn bạn đã tin tưởng Mitchi!`);
-          toast("📋 Đã copy text hóa đơn!");
-        }}>📋 Copy text gửi Zalo/Messenger</button>
-        <div style={{height:8}}/>
-        <button className="btn btn-gh" onClick={onClose}>Đóng</button>
+        <button className="btn" style={{background:"transparent",color:"rgba(255,255,255,.5)",border:"1.5px solid rgba(255,255,255,.2)",boxShadow:"none"}} onClick={onClose}>Đóng</button>
       </div>
     </div>
   );
