@@ -1,339 +1,350 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
 
-// ── FONTS ─────────────────────────────────────────────────────────────────────
-const P = {
-  sky:"#5BC8F5", skydk:"#3AAEDB",
-  green:"#3FAF62", greenlt:"#6DCF8A", greenbg:"#E8F8EE",
-  red:"#D93025", yellow:"#F5C842", yellowbg:"#FFFBE6",
-  ink:"#1A2E1F", inkmid:"#2D4835", muted:"#6B8872",
-  border:"#C8E6C9", cloud:"#EDF9FF",
-  card:"#FFFFFF", bg:"#F4FCF6",
-  orange:"#F97316", pink:"#F472B6", purple:"#A855F7",
+// ── DESIGN TOKENS ─────────────────────────────────────────────────────────────
+const T = {
+  // Neutral base
+  bg:      "#F7F5F0",   // cream
+  card:    "#FFFFFF",
+  ink:     "#1C2B1A",   // dark green-black
+  ink2:    "#3D4F3B",
+  muted:   "#7A8C78",
+  border:  "#E2DDD6",
+  border2: "#C8C0B8",
+
+  // Accents
+  green:   "#2D6A4F",   // success
+  greenlt: "#52B788",
+  greenbg: "#D8F3DC",
+  red:     "#C1121F",   // danger
+  redbg:   "#FFE5E7",
+  yellow:  "#E9C46A",   // pending
+  yellowbg:"#FFF8E1",
+  purple:  "#6B3FA0",   // VIP/tips
+  purplebg:"#EDE7F6",
+  blue:    "#1D6FA4",   // info
+  bluebg:  "#E3F2FD",
+
+  // Invoice theme
+  navy:    "#0D1B3E",
+  invRed:  "#C0392B",
+  gold:    "#E8C97A",
 };
 
 const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&family=Nunito+Sans:wght@400;500;600;700&display=swap');
+
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:${P.bg};font-family:'Nunito Sans',sans-serif;color:${P.ink};-webkit-font-smoothing:antialiased}
-.app{max-width:430px;margin:0 auto;min-height:100dvh;background:${P.bg}}
+body{background:${T.bg};font-family:'Nunito Sans',sans-serif;color:${T.ink};-webkit-font-smoothing:antialiased;overscroll-behavior:none}
+.app{max-width:430px;margin:0 auto;min-height:100dvh;background:${T.bg};position:relative}
 
-/* BOX */
-.box{background:${P.card};border-radius:18px;border:2.5px solid ${P.ink};box-shadow:3px 3px 0 ${P.ink};padding:16px}
-.box-greenbg{background:${P.greenbg};border-color:${P.border};box-shadow:none}
-.box-yellowbg{background:${P.yellowbg};border-color:#F5C842;box-shadow:none}
-.box-sky{background:${P.sky}}
-.box-green{background:${P.green}}
+/* ── CARD SYSTEM ── */
+.card{background:${T.card};border-radius:16px;border:2px solid ${T.border};padding:16px}
+.card-ink{background:${T.ink};border-color:${T.ink}}
+.card-green{background:${T.greenbg};border-color:${T.greenlt}}
+.card-red{background:${T.redbg};border-color:${T.red}}
+.card-yellow{background:${T.yellowbg};border-color:${T.yellow}}
+.card-purple{background:${T.purplebg};border-color:${T.purple}}
+.card-blue{background:${T.bluebg};border-color:${T.blue}}
 
-/* HEADER */
-.hdr{background:${P.sky};padding:50px 18px 18px;border-bottom:3px solid ${P.ink};position:relative;overflow:hidden}
-.hdr-eye{font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:${P.inkmid};margin-bottom:3px}
-.hdr-h1{font-family:'Nunito',sans-serif;font-size:28px;font-weight:900;color:${P.ink};line-height:1}
-.hdr-sub{font-size:12px;font-weight:700;color:${P.inkmid};margin-top:5px}
-.hdr-deco{position:absolute;right:18px;top:50%;transform:translateY(-50%);font-size:52px;opacity:.18;pointer-events:none}
+/* ── HEADER ── */
+.hdr{background:${T.ink};padding:52px 20px 20px;position:relative;overflow:hidden}
+.hdr::after{content:'';position:absolute;bottom:-40px;right:-40px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.04);pointer-events:none}
+.hdr-eye{font-family:'Nunito',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:rgba(255,255,255,.45);margin-bottom:4px}
+.hdr-h1{font-family:'Nunito',sans-serif;font-size:26px;font-weight:900;color:#fff;line-height:1.1}
+.hdr-sub{font-size:12px;font-weight:600;color:rgba(255,255,255,.5);margin-top:5px}
+.hdr-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700;color:rgba(255,255,255,.8);margin-top:8px}
 
-/* NAV */
-.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:${P.ink};border-top:3px solid ${P.ink};display:flex;justify-content:space-around;padding:10px 2px 22px;z-index:100}
-.nb{display:flex;flex-direction:column;align-items:center;gap:3px;color:rgba(255,255,255,.4);font-size:9px;font-weight:800;font-family:'Nunito',sans-serif;text-transform:uppercase;letter-spacing:.4px;background:none;border:none;cursor:pointer;padding:3px 6px;border-radius:10px}
-.nb.on{color:${P.yellow}}
-.nb svg{width:20px;height:20px;stroke-width:2.5}
+/* ── BOTTOM NAV ── */
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:${T.ink};border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-around;padding:10px 4px 22px;z-index:100}
+.nb{display:flex;flex-direction:column;align-items:center;gap:3px;color:rgba(255,255,255,.35);font-size:9px;font-weight:700;font-family:'Nunito',sans-serif;text-transform:uppercase;letter-spacing:.5px;background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:10px;transition:color .15s}
+.nb.on{color:${T.yellow}}
+.nb svg{width:20px;height:20px;stroke-width:2}
 
-/* FAB */
-.fab{position:fixed;bottom:82px;right:calc(50% - 215px + 16px);width:54px;height:54px;border-radius:50%;background:${P.red};border:3px solid ${P.ink};box-shadow:4px 4px 0 ${P.ink};display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:99;transition:transform .1s,box-shadow .1s}
-.fab:active{transform:translate(3px,3px);box-shadow:1px 1px 0 ${P.ink}}
-.fab svg{width:24px;height:24px;stroke:#fff;stroke-width:2.5}
+/* ── FAB ── */
+.fab{position:fixed;bottom:86px;right:calc(50% - 215px + 18px);width:48px;height:48px;border-radius:50%;background:${T.green};border:2px solid ${T.ink};box-shadow:0 4px 16px rgba(45,106,79,.35);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:99;transition:transform .15s,box-shadow .15s}
+.fab:active{transform:scale(.93);box-shadow:0 2px 8px rgba(45,106,79,.25)}
+.fab svg{width:22px;height:22px;stroke:#fff;stroke-width:2.5}
+.fab-menu{position:fixed;bottom:142px;right:calc(50% - 215px + 18px);display:flex;flex-direction:column;gap:8px;z-index:98;align-items:flex-end;animation:fabIn .2s ease}
+@keyframes fabIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fab-item{display:flex;align-items:center;gap:10px;cursor:pointer}
+.fab-item-btn{background:${T.card};border:2px solid ${T.ink};border-radius:12px;padding:10px 14px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;color:${T.ink};white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.1);transition:all .12s}
+.fab-item-btn:active{transform:scale(.96)}
+.fab-dot{width:36px;height:36px;border-radius:50%;border:2px solid ${T.ink};display:flex;align-items:center;justify-content:center;font-size:16px;background:${T.card};box-shadow:0 2px 8px rgba(0,0,0,.1)}
 
-/* MODAL */
-.overlay{position:fixed;inset:0;background:rgba(26,46,31,.65);z-index:200;display:flex;align-items:flex-end;justify-content:center;animation:fi .2s ease}
+/* ── MODAL / SHEET ── */
+.overlay{position:fixed;inset:0;background:rgba(28,43,26,.6);z-index:200;display:flex;align-items:flex-end;justify-content:center;animation:fi .2s ease;backdrop-filter:blur(2px)}
 @keyframes fi{from{opacity:0}to{opacity:1}}
-.sheet{background:${P.bg};border-radius:26px 26px 0 0;border-top:3px solid ${P.ink};border-left:3px solid ${P.ink};border-right:3px solid ${P.ink};padding:20px 18px 48px;width:100%;max-width:430px;max-height:92dvh;overflow-y:auto;animation:su .3s cubic-bezier(.32,.72,0,1)}
+.sheet{background:${T.bg};border-radius:24px 24px 0 0;border-top:1px solid ${T.border};padding:20px 18px 48px;width:100%;max-width:430px;max-height:92dvh;overflow-y:auto;animation:su .28s cubic-bezier(.32,.72,0,1)}
 @keyframes su{from{transform:translateY(100%)}to{transform:translateY(0)}}
-.drag{width:40px;height:5px;background:${P.border};border-radius:3px;border:1.5px solid ${P.ink};margin:0 auto 18px}
-.mh{font-family:'Nunito',sans-serif;font-size:22px;font-weight:900;color:${P.ink};margin-bottom:16px}
+.drag-h{width:36px;height:4px;background:${T.border2};border-radius:2px;margin:0 auto 20px}
+.sheet-title{font-family:'Nunito',sans-serif;font-size:20px;font-weight:900;color:${T.ink};margin-bottom:16px}
 
-/* FORM */
+/* ── FORM ── */
 .f{margin-bottom:12px}
-.f label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:${P.muted};margin-bottom:5px}
-.f input,.f select,.f textarea{width:100%;padding:11px 14px;border-radius:12px;border:2px solid ${P.ink};background:${P.card};font-family:'Nunito Sans',sans-serif;font-size:14px;font-weight:600;color:${P.ink};outline:none;box-shadow:2px 2px 0 ${P.ink};transition:all .12s}
-.f input:focus,.f select:focus,.f textarea:focus{border-color:${P.green};box-shadow:3px 3px 0 ${P.green}}
-.f textarea{resize:vertical;min-height:68px}
+.f label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:${T.muted};margin-bottom:5px}
+.f input,.f select,.f textarea{width:100%;padding:11px 14px;border-radius:12px;border:1.5px solid ${T.border2};background:${T.card};font-family:'Nunito Sans',sans-serif;font-size:14px;font-weight:600;color:${T.ink};outline:none;transition:border-color .15s,box-shadow .15s}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:${T.green};box-shadow:0 0 0 3px rgba(45,106,79,.12)}
+.f textarea{resize:vertical;min-height:72px}
 
-/* BTN */
-.btn{width:100%;padding:13px;border-radius:14px;border:2.5px solid ${P.ink};font-family:'Nunito',sans-serif;font-size:14px;font-weight:900;cursor:pointer;box-shadow:3px 3px 0 ${P.ink};transition:transform .1s,box-shadow .1s}
-.btn:active{transform:translate(3px,3px);box-shadow:0 0 0}
-.btn-g{background:${P.green};color:#fff}
-.btn-y{background:${P.yellow};color:${P.ink}}
-.btn-s{background:${P.sky};color:${P.ink}}
-.btn-r{background:${P.red};color:#fff}
-.btn-gh{background:${P.card};color:${P.muted}}
-.btn-xs{width:auto;padding:7px 12px;border-radius:10px;font-size:12px;border:2px solid ${P.ink};box-shadow:2px 2px 0 ${P.ink};font-family:'Nunito',sans-serif;font-weight:800;cursor:pointer;transition:all .1s}
-.btn-xs:active{transform:translate(2px,2px);box-shadow:0 0}
+/* ── BTN ── */
+.btn{width:100%;padding:13px;border-radius:12px;border:none;font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;cursor:pointer;transition:all .15s;letter-spacing:.2px}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:${T.ink};color:#fff}
+.btn-green{background:${T.green};color:#fff}
+.btn-red{background:${T.red};color:#fff}
+.btn-yellow{background:${T.yellow};color:${T.ink}}
+.btn-ghost{background:transparent;color:${T.muted};border:1.5px solid ${T.border2}}
+.btn-outline{background:transparent;color:${T.ink};border:1.5px solid ${T.border2}}
+.xs{width:auto;padding:7px 13px;border-radius:10px;font-size:12px;font-weight:700;border:1.5px solid ${T.border2};font-family:'Nunito',sans-serif;cursor:pointer;transition:all .12s;background:${T.card};color:${T.ink}}
+.xs:active{transform:scale(.95)}
+.xs-green{background:${T.greenbg};color:${T.green};border-color:${T.greenlt}}
+.xs-red{background:${T.redbg};color:${T.red};border-color:${T.red}}
+.xs-yellow{background:${T.yellowbg};color:#92660A;border-color:${T.yellow}}
+.xs-purple{background:${T.purplebg};color:${T.purple};border-color:${T.purple}}
 
-/* BADGE */
-.bd{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;border:1.5px solid ${P.ink};font-size:10px;font-weight:800;font-family:'Nunito',sans-serif}
-.bd-paid{background:${P.greenlt};color:${P.ink}}
-.bd-pend{background:${P.yellow};color:${P.ink}}
-.bd-new{background:${P.sky};color:${P.ink}}
-.bd-view{background:#E9D5FF;color:#6B21A8}
-.bd-can{background:#FFB3B3;color:${P.ink}}
+/* ── BADGE ── */
+.bd{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;font-family:'Nunito',sans-serif;letter-spacing:.3px}
+.bd-paid{background:${T.greenbg};color:${T.green}}
+.bd-pend{background:${T.yellowbg};color:#92660A}
+.bd-new{background:${T.bluebg};color:${T.blue}}
+.bd-view{background:${T.purplebg};color:${T.purple}}
+.bd-can{background:${T.redbg};color:${T.red}}
+.bd-confirm{background:${T.greenbg};color:${T.green}}
 
-/* TAG */
-.tg{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;border:1.5px solid ${P.ink};font-size:10px;font-weight:800;font-family:'Nunito',sans-serif;margin-right:4px;margin-top:3px}
-.tg-vip{background:${P.yellow}}
-.tg-new{background:${P.greenlt}}
-.tg-fu{background:#FDA4AF}
-.tg-old{background:${P.sky}}
-.tg-tip{background:#E9D5FF}
+/* ── TAG ── */
+.tg{display:inline-flex;align-items:center;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;margin-right:4px;margin-top:3px;font-family:'Nunito',sans-serif}
+.tg-vip{background:${T.yellow};color:#7A5000}
+.tg-new{background:${T.greenbg};color:${T.green}}
+.tg-fu{background:#FCE4EC;color:#AD1457}
+.tg-old{background:${T.bluebg};color:${T.blue}}
+.tg-tip{background:${T.purplebg};color:${T.purple}}
 
-/* ROW */
-.row{background:${P.card};border-radius:15px;border:2px solid ${P.ink};box-shadow:3px 3px 0 ${P.ink};padding:13px 14px;display:flex;align-items:center;gap:12px;margin-bottom:9px;cursor:pointer;transition:transform .1s,box-shadow .1s}
-.row:active{transform:translate(2px,2px);box-shadow:1px 1px 0 ${P.ink}}
-.ava{width:40px;height:40px;border-radius:12px;border:2px solid ${P.ink};box-shadow:2px 2px 0 ${P.ink};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+/* ── ROW ── */
+.row{background:${T.card};border-radius:14px;border:1.5px solid ${T.border};padding:13px 14px;display:flex;align-items:center;gap:12px;margin-bottom:8px;cursor:pointer;transition:all .15s}
+.row:active{background:${T.bg};transform:scale(.99)}
+.ava{width:40px;height:40px;border-radius:12px;border:1.5px solid ${T.border};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;background:${T.bg}}
 
-/* STAT */
-.sg{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px;margin-top:14px}
-.sc{border-radius:17px;border:2.5px solid ${P.ink};box-shadow:3px 3px 0 ${P.ink};padding:14px}
-.sc-n{font-family:'Nunito',sans-serif;font-size:22px;font-weight:900;color:${P.ink};line-height:1}
-.sc-l{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:${P.inkmid};margin-top:3px}
-.sc-i{font-size:20px;margin-bottom:5px}
+/* ── METRIC CARD ── */
+.metric-big{background:${T.ink};border-radius:18px;padding:20px;position:relative;overflow:hidden}
+.metric-big::after{content:'';position:absolute;right:-20px;top:-20px;width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,.04)}
+.metric-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.45);margin-bottom:6px}
+.metric-value{font-family:'Nunito',sans-serif;font-size:32px;font-weight:900;color:#fff;line-height:1}
+.metric-sub{font-size:11px;font-weight:600;color:rgba(255,255,255,.5);margin-top:5px}
+.metric-sm{background:${T.card};border-radius:14px;border:1.5px solid ${T.border};padding:14px}
+.metric-sm-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:${T.muted};margin-bottom:5px}
+.metric-sm-value{font-family:'Nunito',sans-serif;font-size:22px;font-weight:900;color:${T.ink};line-height:1}
+.metric-sm-sub{font-size:11px;font-weight:600;color:${T.muted};margin-top:3px}
 
-/* SEC */
+/* ── ACTION CARD ── */
+.action-card{background:${T.card};border-radius:14px;border:1.5px solid ${T.border};padding:14px;margin-bottom:8px}
+.action-card-red{border-left:4px solid ${T.red};background:${T.redbg};border-color:${T.red}}
+.action-card-yellow{border-left:4px solid ${T.yellow};background:${T.yellowbg};border-color:${T.yellow}}
+.action-card-green{border-left:4px solid ${T.green};background:${T.greenbg};border-color:${T.greenlt}}
+.action-card-purple{border-left:4px solid ${T.purple};background:${T.purplebg};border-color:${T.purple}}
+
+/* ── SEC ── */
 .sec{padding:16px 16px 0}
-.sec-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.sec-t{font-family:'Nunito',sans-serif;font-size:17px;font-weight:900;color:${P.ink}}
-.sec-a{font-size:12px;font-weight:700;color:${P.green};cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.sec-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.sec-t{font-family:'Nunito',sans-serif;font-size:15px;font-weight:900;color:${T.ink}}
+.sec-a{font-size:12px;font-weight:700;color:${T.green};cursor:pointer}
 
-/* MISC */
-.pill-row{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
-.pill{padding:6px 13px;border-radius:20px;border:2px solid ${P.ink};font-size:12px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;transition:all .1s;box-shadow:2px 2px 0 ${P.ink}}
-.pill.on{background:${P.green};color:#fff}
-.pill:not(.on){background:${P.card};color:${P.ink}}
-.pill:active{transform:translate(2px,2px);box-shadow:0 0}
-.sb{width:calc(100% - 32px);margin:10px 16px 0;padding:11px 16px 11px 42px;border-radius:13px;border:2px solid ${P.ink};box-shadow:3px 3px 0 ${P.ink};background:${P.card} url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24' stroke='%236B8872' stroke-width='2.5'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 14px center;font-family:'Nunito Sans',sans-serif;font-size:14px;font-weight:600;color:${P.ink};outline:none}
-.sb:focus{border-color:${P.green};box-shadow:3px 3px 0 ${P.green}}
-.tog{width:40px;height:22px;border-radius:11px;border:2px solid ${P.ink};position:relative;cursor:pointer;flex-shrink:0;transition:background .2s;background:none}
-.tog.on{background:${P.green}}
-.tog.off{background:${P.border}}
-.tog::after{content:'';position:absolute;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;border:1.5px solid ${P.ink};transition:left .2s}
-.tog.on::after{left:20px}
+/* ── SEARCH ── */
+.sb{width:calc(100% - 32px);margin:12px 16px 0;padding:11px 16px 11px 40px;border-radius:12px;border:1.5px solid ${T.border2};background:${T.card} url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' fill='none' viewBox='0 0 24 24' stroke='%237A8C78' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 13px center;font-family:'Nunito Sans',sans-serif;font-size:14px;font-weight:600;color:${T.ink};outline:none;transition:border-color .15s}
+.sb:focus{border-color:${T.green};box-shadow:0 0 0 3px rgba(45,106,79,.1)}
+
+/* ── PILL ── */
+.pill-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.pill{padding:6px 13px;border-radius:20px;border:1.5px solid ${T.border2};font-size:12px;font-weight:700;cursor:pointer;font-family:'Nunito',sans-serif;transition:all .12s;background:${T.card};color:${T.muted}}
+.pill.on{background:${T.ink};color:#fff;border-color:${T.ink}}
+
+/* ── TOGGLE ── */
+.tog{width:38px;height:21px;border-radius:11px;border:1.5px solid ${T.border2};position:relative;cursor:pointer;flex-shrink:0;transition:background .2s;background:${T.border}}
+.tog.on{background:${T.green};border-color:${T.green}}
+.tog::after{content:'';position:absolute;top:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:left .18s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tog.on::after{left:19px}
 .tog.off::after{left:2px}
-.bc{display:flex;align-items:flex-end;gap:6px;height:88px}
-.bcol{display:flex;flex-direction:column;align-items:center;flex:1;gap:5px}
-.bbar{border-radius:8px 8px 0 0;width:100%;border:1.5px solid ${P.ink};min-height:6px;transition:height .5s}
-.blbl{font-size:9px;font-weight:800;color:${P.muted};text-transform:uppercase}
+
+/* ── BAR CHART ── */
+.bc{display:flex;align-items:flex-end;gap:5px;height:80px}
+.bcol{display:flex;flex-direction:column;align-items:center;flex:1;gap:4px}
+.bbar{border-radius:6px 6px 0 0;width:100%;min-height:4px;transition:height .5s cubic-bezier(.34,1.2,.64,1)}
+.blbl{font-size:9px;font-weight:700;color:${T.muted};text-transform:uppercase}
+
+/* ── RBAR ── */
 .rb-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.rb-lbl{font-size:12px;font-weight:700;color:${P.ink};min-width:90px}
-.rb-track{flex:1;height:12px;background:${P.border};border-radius:7px;border:1.5px solid ${P.ink};overflow:hidden}
-.rb-fill{height:100%;border-radius:5px;transition:width .6s}
-.rb-val{font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;color:${P.ink};min-width:44px;text-align:right}
+.rb-lbl{font-size:12px;font-weight:600;color:${T.ink};min-width:90px}
+.rb-track{flex:1;height:8px;background:${T.border};border-radius:4px;overflow:hidden}
+.rb-fill{height:100%;border-radius:4px;transition:width .6s}
+.rb-val{font-family:'Nunito',sans-serif;font-size:12px;font-weight:900;color:${T.ink};min-width:44px;text-align:right}
+
+/* ── CAL ── */
+.cal-hd{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:0 16px;margin-bottom:6px}
+.cal-dh{text-align:center;font-size:10px;font-weight:700;color:${T.muted};text-transform:uppercase}
+.cal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;padding:0 16px}
+.cd{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;transition:all .12s;position:relative;font-family:'Nunito',sans-serif;color:${T.ink}}
+.cd:hover{background:${T.border}}
+.cd.today{background:${T.ink};color:#fff}
+.cd.has::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:${T.green}}
+
+/* ── INVOICE ── */
+.inv-wrap{background:linear-gradient(160deg,#0D1B3E 0%,#1a2d5a 100%);border-radius:16px;overflow:hidden;border:1px solid rgba(232,201,122,.2)}
+
+/* ── TOAST ── */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:${T.ink};color:#fff;padding:10px 20px;border-radius:24px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;z-index:999;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.2);animation:tst .3s cubic-bezier(.34,1.2,.64,1)}
+@keyframes tst{from{opacity:0;top:10px}to{opacity:1;top:20px}}
+
+/* ── EMPTY STATE ── */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center}
+.empty-ico{font-size:48px;margin-bottom:12px;opacity:.4}
+.empty-title{font-family:'Nunito',sans-serif;font-size:16px;font-weight:800;color:${T.muted};margin-bottom:6px}
+.empty-sub{font-size:13px;color:${T.muted};font-weight:500}
+
+/* ── LOGIN ── */
+.login-bg{min-height:100dvh;background:${T.ink};display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;position:relative;overflow:hidden}
+.login-bg::before{content:'✦';position:absolute;font-size:200px;color:rgba(255,255,255,.02);top:50%;left:50%;transform:translate(-50%,-50%)}
+
+/* ── MISC ── */
 .scroll-body{padding-bottom:100px}
-.divider{height:1.5px;background:${P.border};margin:12px 0;border:none}
-.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:${P.ink};color:${P.yellow};padding:11px 22px;border-radius:50px;border:2.5px solid ${P.yellow};font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;z-index:999;white-space:nowrap;box-shadow:4px 4px 0 ${P.yellow};animation:tst .3s cubic-bezier(.34,1.56,.64,1)}
-@keyframes tst{from{opacity:0;top:0}to{opacity:1;top:20px}}
-
-/* LOGIN */
-.login-wrap{min-height:100dvh;background:${P.sky};display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;position:relative;overflow:hidden}
-.lc{position:absolute;background:#fff;border-radius:50px;border:2px solid ${P.ink};opacity:.5}
-.lcard{background:${P.card};border-radius:24px;border:3px solid ${P.ink};box-shadow:6px 6px 0 ${P.ink};padding:24px;width:100%;max-width:360px}
-.lf label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:${P.muted};margin-bottom:5px}
-.lf input{width:100%;padding:12px 14px;margin-bottom:12px;border-radius:12px;border:2px solid ${P.ink};box-shadow:2px 2px 0 ${P.ink};background:${P.bg};font-family:'Nunito Sans',sans-serif;font-size:14px;font-weight:600;outline:none}
-.lf input:focus{border-color:${P.green};box-shadow:3px 3px 0 ${P.green}}
-
-/* INVOICE PRINT */
-.inv{background:${P.card};border-radius:20px;border:3px solid ${P.ink};box-shadow:5px 5px 0 ${P.ink};overflow:hidden}
-.inv-hdr{background:${P.sky};padding:18px;border-bottom:2.5px solid ${P.ink};text-align:center}
-.inv-body{padding:16px}
-.inv-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1.5px dashed ${P.border}}
-.inv-row:last-child{border:none}
-
-/* CAL */
-.cal-hd{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;padding:0 16px;margin-bottom:6px}
-.cal-dh{text-align:center;font-size:10px;font-weight:800;color:${P.muted};text-transform:uppercase}
-.cal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:0 16px}
-.cd{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:13px;font-weight:700;font-family:'Nunito',sans-serif;cursor:pointer;transition:all .12s;position:relative}
-.cd:hover{background:${P.cloud}}
-.cd.today{background:${P.green};color:#fff;border:2px solid ${P.ink};box-shadow:2px 2px 0 ${P.ink}}
-.cd.has::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:${P.red};border:1px solid ${P.ink}}
-
-/* SERVICE ICONS */
-.ico-pick{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
-.ico-btn{width:38px;height:38px;border-radius:10px;font-size:19px;cursor:pointer;transition:all .1s;display:flex;align-items:center;justify-content:center}
+.divider{height:1px;background:${T.border};margin:12px 0}
+.ico-pick{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.ico-btn{width:36px;height:36px;border-radius:9px;font-size:18px;cursor:pointer;transition:all .1s;display:flex;align-items:center;justify-content:center;border:1.5px solid ${T.border}}
 `;
 
 // ── ICONS ─────────────────────────────────────────────────────────────────────
 const I = {
-  home:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
-  order:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
-  users:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-  cal:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
-  msg:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
-  chart:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
-  cog:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
-  plus:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
-  edit:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
-  trash:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>,
-  back:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"/></svg>,
-  receipt: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V8z"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
-  heart:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  home:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  order: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
+  users: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  cal:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  msg:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+  chart: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
+  cog:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  plus:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  x:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  chk:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>,
+  bell:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+  send:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
+  rec:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V8z"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
+  arr:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>,
 };
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 const vnd = n => Number(n||0).toLocaleString("vi-VN") + "đ";
-const today = () => new Date().toLocaleDateString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"});
-const now = () => new Date().toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"});
-const uid = () => Date.now() + Math.random().toString(36).slice(2,6);
-
-// Tính tiền câu lẻ
-const calcQ = (q, p1, p6) => {
-  const n=parseInt(q)||0; if(!n) return 0;
-  return n<=5 ? n*p1 : 5*p1+(n-5)*(p6||p1);
-};
-
-// Tính tổng đơn
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+const todayStr = () => new Date().toLocaleDateString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"});
+const nowStr = () => new Date().toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"});
+const calcQ = (q, p1, p6) => { const n=parseInt(q)||0; if(!n) return 0; return n<=5?n*p1:5*p1+(n-5)*(p6||p1); };
 const calcOrderTotal = (items, extraQ, services) => {
-  let total = 0;
-  items.forEach(it => {
-    const svc = services.find(s=>s.id===it.svcId);
-    if (!svc) return;
-    if (svc.type==="fixed") total += svc.price * (it.qty||1);
-    else total += calcQ(it.qty, svc.price, svc.price6);
+  let t = 0;
+  (items||[]).forEach(it => {
+    const s = services.find(x=>x.id===it.svcId); if(!s) return;
+    t += s.type==="fixed" ? s.price : calcQ(it.qty, s.price, s.price6);
   });
-  if (extraQ>0) {
-    // extra câu lẻ dùng giá mặc định 20k/15k nếu không chọn dịch vụ riêng
-    total += calcQ(extraQ, 20000, 15000);
-  }
-  return total;
+  t += calcQ(extraQ, 20000, 15000);
+  return t;
 };
-
-const STATUS_MAP = {
-  new:   ["MỚI","bd-new"],
-  view:  ["ĐANG XEM","bd-view"],
-  done:  ["XONG","bd-pend"],
-  paid:  ["ĐÃ TT","bd-paid"],
-  cancel:["HỦY","bd-can"],
-};
+const STATUS_MAP = { new:["MỚI","bd-new"], view:["ĐANG XEM","bd-view"], done:["XONG","bd-pend"], paid:["ĐÃ TT","bd-paid"], cancel:["HỦY","bd-can"] };
 const STATUS_FLOW = ["new","view","done","paid","cancel"];
+const GROUPS = ["Tình yêu","Hôn nhân / Ex","Sự nghiệp","Tài chính","Gia đình","Sức khỏe","Tổng quát"];
+const AVAS = ["🌙","🌸","⭐","🦋","🌺","🌊","💫","🔮","🌈","🎴","🌿","🪷"];
+const ICOS = ["💜","⭐","🌙","✨","🔮","🌟","🌸","🦋","🌈","🎴","🌊","🔥"];
+const REPLIES = [
+  {id:1,hash:"#menu",   title:"Menu dịch vụ",       body:"✨ MITCHI THE MIGHTY ✨\nTarot & Lenormand Reader\n\n💜 Tarot Tình Yêu: 20k/câu\n⭐ Tarot Sự Nghiệp: 20k/câu\n🌙 Lenormand Tổng Quát: 100k trọn gói\n\n📌 5 câu đầu: 20k/câu\n📌 Từ câu 6+: 15k/câu\n\nInbox để đặt lịch nha bạn 🌙"},
+  {id:2,hash:"#baogia", title:"Báo giá",             body:"Chào bạn! ✨\nGiá xem của Mitchi:\n• 5 câu đầu: 20.000đ/câu = 100.000đ\n• Từ câu 6+: 15.000đ/câu\nVD: 7 câu = 100k + 30k = 130.000đ 💜"},
+  {id:3,hash:"#booking",title:"Hướng dẫn đặt lịch", body:"Đặt lịch với Mitchi:\n1️⃣ Nhắn câu hỏi muốn xem\n2️⃣ Mitchi báo giá & xác nhận\n3️⃣ Xem bài → nhận hóa đơn\n4️⃣ Chuyển khoản là xong ✨"},
+  {id:4,hash:"#thanhtoan",title:"Nhắc thanh toán",  body:"Bạn ơi đây là hóa đơn xem bài của mình nhé! 🌙\nBạn chuyển khoản giúp Mitchi với nha 💜\nThông tin CK có trong hóa đơn ạ!"},
+  {id:5,hash:"#trabai",  title:"Trả kết quả",       body:"Mitchi đã xem xong cho bạn rồi nhé! ✨\n[Đính kèm ảnh kết quả + hóa đơn]\nCó thắc mắc gì cứ nhắn Mitchi nha 🌙"},
+  {id:6,hash:"#camon",   title:"Cảm ơn",            body:"Cảm ơn bạn đã tin tưởng Mitchi! 💜✨\nMong bài mang năng lượng tích cực cho bạn~\nHẹn gặp lại lần sau nhé 🌙"},
+  {id:7,hash:"#followup",title:"Follow-up",         body:"Dạo này bạn thế nào rồi? 🌙\nMitchi đang nghĩ đến bạn ~\nNếu có chuyện cần chia sẻ hay xem bài, cứ nhắn Mitchi nha 💜"},
+];
+const WEEK_DAYS = ["T2","T3","T4","T5","T6","T7","CN"];
+const WEEK_COLORS = [T.green, T.blue, T.yellow, T.green, "#52B788", T.purple, T.red];
 
+// ── SEED DATA ─────────────────────────────────────────────────────────────────
+const SEED_SVCS = [
+  {id:"s1",name:"Tarot Tình Yêu",   ico:"💜",type:"per_q",price:20000,price6:15000,dur:60,active:true,sold:42},
+  {id:"s2",name:"Tarot Sự Nghiệp",  ico:"⭐",type:"per_q",price:20000,price6:15000,dur:60,active:true,sold:28},
+  {id:"s3",name:"Lenormand Tổng Quát",ico:"🌙",type:"fixed",price:100000,price6:0,dur:45,active:true,sold:19},
+  {id:"s4",name:"Tarot Tổng Quát",  ico:"✨",type:"per_q",price:20000,price6:15000,dur:60,active:true,sold:15},
+];
+const SEED_CUSTS = [
+  {id:"c1",name:"Linh Nguyễn",  nick:"Bé Linh",  phone:"0901234567",social:"fb/linhng",  tags:["vip","old"],ava:"🌸",notes:"Hay hỏi về tình yêu",created:"01/01/2025",lastOrder:"08/05/2025"},
+  {id:"c2",name:"Minh Châu",    nick:"Châu",      phone:"0912345678",social:"zalo/mc",    tags:["new"],      ava:"⭐",notes:"",created:todayStr(),lastOrder:todayStr()},
+  {id:"c3",name:"Thu Hà",       nick:"Hà Trắng", phone:"0923456789",social:"tele/thuha", tags:["old","fu"],  ava:"🌙",notes:"Hay lo lắng về sự nghiệp",created:"10/02/2025",lastOrder:"01/04/2025"},
+  {id:"c4",name:"Mai Anh",      nick:"Mai",       phone:"0945678901",social:"fb/maianh", tags:["vip","old"], ava:"🦋",notes:"VIP, tips nhiều",created:"15/01/2025",lastOrder:"05/05/2025"},
+  {id:"c5",name:"Ngọc Trân",    nick:"Trân",      phone:"0956789012",social:"zalo/ngtr",  tags:["old","fu"],  ava:"🌺",notes:"",created:"20/03/2025",lastOrder:"10/03/2025"},
+];
+const SEED_ORDERS = [
+  {id:"o1",custId:"c1",items:[{svcId:"s1",qty:7,group:"Tình yêu"}],   extraQ:0,total:110000,tips:50000,status:"paid",  date:"08/05/2025",time:"09:30",notes:"Xem xong hài lòng"},
+  {id:"o2",custId:"c2",items:[{svcId:"s3",qty:1,group:"Tổng quát"}],  extraQ:0,total:100000,tips:0,    status:"done",  date:todayStr(),  time:"11:00",notes:""},
+  {id:"o3",custId:"c3",items:[{svcId:"s2",qty:5,group:"Sự nghiệp"}],  extraQ:2,total:130000,tips:0,    status:"view",  date:todayStr(),  time:"14:00",notes:""},
+  {id:"o4",custId:"c4",items:[{svcId:"s1",qty:5,group:"Tình yêu"},{svcId:"s2",qty:3,group:"Sự nghiệp"}],extraQ:0,total:160000,tips:100000,status:"paid",date:"07/05/2025",time:"16:00",notes:""},
+  {id:"o5",custId:"c5",items:[{svcId:"s4",qty:4,group:"Tổng quát"}],  extraQ:0,total:80000, tips:0,    status:"new",   date:todayStr(),  time:"15:30",notes:"Khách mới"},
+];
+const SEED_BOOKINGS = [
+  {id:"b1",custId:"c1",svcId:"s1",date:todayStr(),time:"09:30",status:"confirmed",notes:"Hỏi về bạn trai mới"},
+  {id:"b2",custId:"c2",svcId:"s3",date:todayStr(),time:"11:00",status:"confirmed",notes:""},
+  {id:"b3",custId:"c3",svcId:"s2",date:todayStr(),time:"14:00",status:"confirmed",notes:"Muốn đổi việc"},
+  {id:"b4",custId:"c5",svcId:"s4",date:todayStr(),time:"15:30",status:"pending",  notes:"Khách mới, chưa xác nhận"},
+];
+
+// ── SHARED COMPONENTS ─────────────────────────────────────────────────────────
 function Badge({s}) {
   const [t,c] = STATUS_MAP[s]||["?","bd-new"];
   return <span className={`bd ${c}`}>{t}</span>;
 }
 
-const TAG_MAP = {vip:["👑 VIP","tg-vip"],new:["✨ Mới","tg-new"],fu:["📌 Follow","tg-fu"],old:["🔄 Cũ","tg-old"],tip:["💜 Tipper","tg-tip"]};
-const ICOS = ["💜","⭐","🌙","✨","🔮","🌟","🌸","🦋","🌈","🎴","🃏","🌊","🔥","💫","🌺","🐸"];
-const GROUPS = ["Tình yêu / Hôn nhân","Sự nghiệp / Công việc","Tài chính","Sức khỏe","Gia đình","Tổng quát","Tương lai"];
-const WEEK = [{d:"T2",v:320000},{d:"T3",v:510000},{d:"T4",v:280000},{d:"T5",v:620000},{d:"T6",v:450000},{d:"T7",v:780000},{d:"CN",v:590000}];
-const REPLIES = [
-  {id:1,hash:"#menu",   title:"Menu dịch vụ",      body:"💚 MITCHI TAROT 💚\n\n💜 Tarot Tình Yêu: 20k/câu\n⭐ Tarot Sự Nghiệp: 20k/câu\n🌙 Lenormand: 100k trọn gói\n\n📌 5 câu đầu: 20k/câu\n📌 Từ câu 6+: 15k/câu\n\nInbox đặt lịch nhé 💌"},
-  {id:2,hash:"#baogia", title:"Báo giá nhanh",      body:"Chào bạn! 🐸\n• 5 câu đầu: 20.000đ/câu\n• Từ câu 6+: 15.000đ/câu\nVD 7 câu = 100k + 30k = 130.000đ 💚"},
-  {id:3,hash:"#booking",title:"Hướng dẫn đặt lịch", body:"Đặt lịch với Mitchi:\n1️⃣ Nhắn câu hỏi muốn xem\n2️⃣ Mitchi báo giá & xác nhận\n3️⃣ Xem bài → nhận hóa đơn\n4️⃣ Chuyển khoản là xong 🔮"},
-  {id:4,hash:"#tt",     title:"Nhắc thanh toán",    body:"Bạn ơi đây là hóa đơn của mình nha! 🎉\nBạn chuyển khoản giúp Mitchi với nhé 💚"},
-  {id:5,hash:"#trabai", title:"Trả kết quả",        body:"Mitchi đã xem xong bài cho bạn rồi nha! ✨\n[Đính kèm ảnh kết quả + hóa đơn]\nNếu có câu hỏi thêm cứ nhắn Mitchi 🐸"},
-  {id:6,hash:"#camon",  title:"Cảm ơn sau xem",    body:"Cảm ơn bạn đã tin tưởng Mitchi! 🐸💚\nMong bài mang năng lượng tích cực cho bạn~"},
-  {id:7,hash:"#followup",title:"Follow-up khách cũ",body:"Dạo này bạn khỏe không? 🐸\nMitchi nhớ bạn ~ Có chuyện gì cần chia sẻ không? 💚"},
-];
+function DragHandle() { return <div className="drag-h"/>; }
 
-// ── SEED DATA ─────────────────────────────────────────────────────────────────
-const SEED_SVCS = [
-  {id:"s1",name:"Tarot Tình Yêu",   ico:"💜",type:"per_q",price:20000,price6:15000,dur:60, active:true, sold:42},
-  {id:"s2",name:"Tarot Sự Nghiệp",  ico:"⭐",type:"per_q",price:20000,price6:15000,dur:60, active:true, sold:28},
-  {id:"s3",name:"Lenormand Tổng Quát",ico:"🌙",type:"fixed",price:100000,price6:0,dur:45,active:true, sold:19},
-  {id:"s4",name:"Tarot Năm Mới",    ico:"✨",type:"fixed",price:150000,price6:0,dur:30,active:false,sold:7},
-];
-const SEED_CUSTS = [
-  {id:"c1",name:"Linh Nguyễn",nick:"Bé Linh",phone:"0901234567",social:"fb/linhnguyyen",tags:["vip","old"],ava:"🐸",notes:"Hay hỏi về bạn trai",created:"01/01/2025"},
-  {id:"c2",name:"Minh Châu",  nick:"Châu",    phone:"0912345678",social:"zalo/minchau",  tags:["new"],       ava:"🌸",notes:"",created:"05/05/2025"},
-  {id:"c3",name:"Thu Hà",     nick:"Hà Trắng",phone:"0923456789",social:"tele/thuha",   tags:["old","fu"],  ava:"⭐",notes:"Hay đổi việc",created:"10/02/2025"},
-  {id:"c4",name:"Mai Anh",    nick:"Mai",     phone:"0945678901",social:"fb/maianh99",  tags:["vip","old"], ava:"🌙",notes:"VIP, tips nhiều",created:"15/01/2025"},
-];
-const SEED_ORDERS = [
-  {id:"o1",custId:"c1",items:[{svcId:"s1",qty:7,group:"Tình yêu / Hôn nhân"}],extraQ:0,total:110000,tips:50000,status:"paid",  date:"08/05/2025",time:"09:30",notes:"Xem xong khách hài lòng"},
-  {id:"o2",custId:"c2",items:[{svcId:"s3",qty:1,group:"Tổng quát"}],          extraQ:0,total:100000,tips:0,    status:"done",  date:"08/05/2025",time:"11:00",notes:""},
-  {id:"o3",custId:"c3",items:[{svcId:"s2",qty:10,group:"Sự nghiệp / Công việc"}],extraQ:0,total:175000,tips:0, status:"new",  date:"08/05/2025",time:"14:15",notes:""},
-  {id:"o4",custId:"c4",items:[{svcId:"s1",qty:5,group:"Tình yêu / Hôn nhân"},{svcId:"s2",qty:3,group:"Sự nghiệp / Công việc"}],extraQ:2,total:225000,tips:100000,status:"paid",date:"07/05/2025",time:"16:00",notes:""},
-];
-const SEED_BOOKINGS = [
-  {id:"b1",custId:"c1",svc:"Tarot Tình Yêu",date:"09/05/2025",time:"09:30",status:"confirmed",notes:"Hỏi về bạn trai mới"},
-  {id:"b2",custId:"c2",svc:"Lenormand",      date:"09/05/2025",time:"11:00",status:"pending",  notes:""},
-  {id:"b3",custId:"c3",svc:"Tarot Sự Nghiệp",date:"09/05/2025",time:"14:15",status:"confirmed",notes:"Muốn đổi việc"},
-];
-
-// ── LOGIN ─────────────────────────────────────────────────────────────────────
-function Login({onLogin}) {
-  const [f,setF]=useState({e:"",p:""});
-  const [err,setErr]=useState("");
-  const go=()=>{
-    if(f.e==="mitchi@shop.vn"&&f.p==="mitchi2024") onLogin();
-    else setErr("Sai email hoặc mật khẩu! 🐸");
-  };
+function EmptyState({ico, title, sub, action, onAction}) {
   return(
-    <div className="login-wrap">
-      <div className="lc" style={{top:50,left:-40,width:160,height:70}}/>
-      <div className="lc" style={{top:30,right:-20,width:120,height:55}}/>
-      <div className="lc" style={{bottom:120,right:-50,width:200,height:85}}/>
-      <div style={{fontSize:64,marginBottom:6}}>🐸</div>
-      <div style={{fontFamily:"Nunito",fontSize:46,fontWeight:900,color:P.ink,letterSpacing:-1,marginBottom:2}}>Mitchi</div>
-      <div style={{fontSize:13,fontWeight:700,color:P.inkmid,marginBottom:28}}>Shop Manager · Tarot & Lenormand</div>
-      <div className="lcard">
-        <div className="lf">
-          <label>Email</label>
-          <input type="email" placeholder="mitchi@shop.vn" value={f.e} onChange={e=>setF(p=>({...p,e:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&go()}/>
-          <label>Mật khẩu</label>
-          <input type="password" placeholder="••••••••" value={f.p} onChange={e=>setF(p=>({...p,p:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&go()}/>
-        </div>
-        {err&&<div style={{color:P.red,fontSize:12,fontWeight:700,textAlign:"center",marginBottom:10}}>{err}</div>}
-        <button className="btn btn-g" onClick={go}>Đăng nhập 🐸</button>
-        <div style={{fontSize:11,fontWeight:700,color:P.muted,textAlign:"center",marginTop:10}}>Demo: mitchi@shop.vn / mitchi2024</div>
-      </div>
+    <div className="empty">
+      <div className="empty-ico">{ico}</div>
+      <div className="empty-title">{title}</div>
+      {sub&&<div className="empty-sub">{sub}</div>}
+      {action&&<button className="btn btn-primary" style={{marginTop:16,width:"auto",padding:"10px 20px"}} onClick={onAction}>{action}</button>}
     </div>
   );
 }
 
-// ── ORDER FORM (create / edit) ────────────────────────────────────────────────
-function OrderForm({order, customers, services, onSave, onClose}) {
+// ── ORDER FORM ────────────────────────────────────────────────────────────────
+function OrderForm({order, customers, services, onSave, onClose, defaultCustId}) {
   const isEdit = !!order;
-  const [custId, setCustId] = useState(order?.custId||"");
-  const [items,  setItems]  = useState(order?.items||[{svcId:"",qty:"",group:""}]);
-  const [extraQ, setExtraQ] = useState(order?.extraQ||0);
-  const [notes,  setNotes]  = useState(order?.notes||"");
-  const [status, setStatus] = useState(order?.status||"new");
+  const [custId, setCustId] = useState(order?.custId || defaultCustId || "");
+  const [items,  setItems]  = useState(order?.items  || [{svcId:"",qty:"",group:""}]);
+  const [extraQ, setExtraQ] = useState(order?.extraQ || 0);
+  const [notes,  setNotes]  = useState(order?.notes  || "");
+  const [status, setStatus] = useState(order?.status || "new");
+  const [err,    setErr]    = useState("");
 
   const addItem = () => setItems(p=>[...p,{svcId:"",qty:"",group:""}]);
   const updItem = (i,k,v) => setItems(p=>p.map((x,j)=>j===i?{...x,[k]:v}:x));
   const delItem = (i) => setItems(p=>p.filter((_,j)=>j!==i));
 
-  const total = (() => {
-    let t=0;
-    items.forEach(it=>{
-      const svc=services.find(s=>s.id===it.svcId);
-      if(!svc) return;
-      if(svc.type==="fixed") t+=svc.price;
-      else t+=calcQ(it.qty,svc.price,svc.price6);
-    });
-    t+=calcQ(extraQ,20000,15000);
-    return t;
-  })();
+  const total = calcOrderTotal(items, extraQ, services);
 
   const save = () => {
-    if(!custId){alert("Chọn khách hàng!");return;}
-    if(items.every(it=>!it.svcId)){alert("Chọn ít nhất 1 dịch vụ!");return;}
+    if (!custId) { setErr("Chọn khách hàng!"); return; }
+    if (items.every(it=>!it.svcId)) { setErr("Chọn ít nhất 1 dịch vụ!"); return; }
+    setErr("");
     onSave({
-      id: order?.id||uid(),
-      custId, items:items.filter(it=>it.svcId),
-      extraQ:parseInt(extraQ)||0,
-      total, tips:order?.tips||0,
+      id: order?.id || uid(),
+      custId, items: items.filter(it=>it.svcId),
+      extraQ: parseInt(extraQ)||0,
+      total, tips: order?.tips||0,
       status, notes,
-      date: order?.date||today(),
-      time: order?.time||now(),
+      date: order?.date || todayStr(),
+      time: order?.time || nowStr(),
     });
   };
 
   return(
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="sheet">
-        <div className="drag"/>
-        <div className="mh">{isEdit?"Sửa đơn ✏️":"Tạo đơn mới 🐸"}</div>
+        <DragHandle/>
+        <div className="sheet-title">{isEdit?"Sửa đơn":"Tạo đơn mới"}</div>
 
-        {/* Khách */}
         <div className="f">
           <label>Khách hàng</label>
           <select value={custId} onChange={e=>setCustId(e.target.value)}>
@@ -342,71 +353,58 @@ function OrderForm({order, customers, services, onSave, onClose}) {
           </select>
         </div>
 
-        {/* Dịch vụ items */}
         <div className="f">
-          <label>Gói dịch vụ đã xem</label>
+          <label>Gói / Dịch vụ đã xem</label>
           {items.map((it,i)=>{
-            const svc=services.find(s=>s.id===it.svcId);
+            const svc = services.find(s=>s.id===it.svcId);
             return(
-              <div key={i} style={{background:P.greenbg,borderRadius:12,border:`1.5px solid ${P.border}`,padding:12,marginBottom:8}}>
-                <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}>
-                  <select style={{flex:1,padding:"9px 10px",borderRadius:10,border:`2px solid ${P.ink}`,background:P.card,fontFamily:"Nunito Sans",fontSize:13,fontWeight:600,outline:"none"}}
+              <div key={i} style={{background:T.greenbg,borderRadius:12,border:`1px solid ${T.border}`,padding:12,marginBottom:8}}>
+                <div style={{display:"flex",gap:8,marginBottom:8}}>
+                  <select style={{flex:1,padding:"9px 10px",borderRadius:10,border:`1.5px solid ${T.border2}`,background:T.card,fontFamily:"Nunito Sans",fontSize:13,fontWeight:600,outline:"none",color:T.ink}}
                     value={it.svcId} onChange={e=>updItem(i,"svcId",e.target.value)}>
                     <option value="">Chọn dịch vụ...</option>
                     {services.filter(s=>s.active).map(s=>(
                       <option key={s.id} value={s.id}>{s.ico} {s.name} — {s.type==="fixed"?vnd(s.price):`${s.price/1000}k/câu`}</option>
                     ))}
                   </select>
-                  {items.length>1&&<button className="btn-xs btn" style={{background:"#FFE4E4",padding:"8px 10px"}} onClick={()=>delItem(i)}>✕</button>}
+                  {items.length>1&&<button className="xs xs-red" onClick={()=>delItem(i)}>✕</button>}
                 </div>
-                {svc&&svc.type==="per_q"&&(
-                  <input type="number" placeholder="Số câu hỏi" min="1" value={it.qty}
-                    onChange={e=>updItem(i,"qty",e.target.value)}
-                    style={{width:"100%",padding:"9px 12px",borderRadius:10,border:`2px solid ${P.ink}`,background:P.card,fontFamily:"Nunito Sans",fontSize:13,fontWeight:600,outline:"none",marginBottom:8}}/>
+                {svc?.type==="per_q"&&(
+                  <input type="number" min="1" placeholder="Số câu hỏi" value={it.qty} onChange={e=>updItem(i,"qty",e.target.value)}
+                    style={{width:"100%",padding:"9px 12px",borderRadius:10,border:`1.5px solid ${T.border2}`,background:T.card,fontFamily:"Nunito Sans",fontSize:13,fontWeight:600,outline:"none",marginBottom:8,color:T.ink}}/>
                 )}
-                <select style={{width:"100%",padding:"9px 10px",borderRadius:10,border:`2px solid ${P.ink}`,background:P.card,fontFamily:"Nunito Sans",fontSize:13,fontWeight:600,outline:"none"}}
+                <select style={{width:"100%",padding:"9px 10px",borderRadius:10,border:`1.5px solid ${T.border2}`,background:T.card,fontFamily:"Nunito Sans",fontSize:13,fontWeight:600,outline:"none",color:T.ink}}
                   value={it.group} onChange={e=>updItem(i,"group",e.target.value)}>
                   <option value="">Chủ đề câu hỏi...</option>
                   {GROUPS.map(g=><option key={g}>{g}</option>)}
                 </select>
                 {svc&&it.qty&&svc.type==="per_q"&&(
-                  <div style={{fontSize:12,fontWeight:800,color:P.green,marginTop:6,textAlign:"right"}}>
+                  <div style={{fontSize:12,fontWeight:700,color:T.green,marginTop:6,textAlign:"right"}}>
                     → {vnd(calcQ(it.qty,svc.price,svc.price6))}
                   </div>
                 )}
-                {svc&&svc.type==="fixed"&&(
-                  <div style={{fontSize:12,fontWeight:800,color:P.green,marginTop:6,textAlign:"right"}}>→ {vnd(svc.price)}</div>
-                )}
+                {svc?.type==="fixed"&&<div style={{fontSize:12,fontWeight:700,color:T.green,marginTop:6,textAlign:"right"}}>→ {vnd(svc.price)}</div>}
               </div>
             );
           })}
-          <button className="btn-xs btn btn-s" onClick={addItem} style={{marginTop:4}}>+ Thêm gói / dịch vụ</button>
+          <button className="xs xs-green" onClick={addItem} style={{marginTop:4}}>+ Thêm dịch vụ</button>
         </div>
 
-        {/* Câu lẻ thêm */}
         <div className="f">
-          <label>Câu hỏi lẻ thêm (ngoài gói) — 20k/câu (từ câu 6: 15k)</label>
+          <label>Câu hỏi lẻ thêm ngoài gói (20k/câu, từ câu 6: 15k)</label>
           <input type="number" min="0" placeholder="0 = không có" value={extraQ||""} onChange={e=>setExtraQ(e.target.value)}/>
-          {extraQ>0&&<div style={{fontSize:12,fontWeight:800,color:P.orange,marginTop:4}}>+ {vnd(calcQ(extraQ,20000,15000))} câu lẻ</div>}
-        </div>
-
-        {/* Chủ đề tổng */}
-        <div className="f">
-          <label>Ghi chú</label>
-          <textarea placeholder="Ghi chú thêm về buổi xem..." value={notes} onChange={e=>setNotes(e.target.value)}/>
+          {extraQ>0&&<div style={{fontSize:12,fontWeight:700,color:T.green,marginTop:4}}>+ {vnd(calcQ(extraQ,20000,15000))}</div>}
         </div>
 
         {isEdit&&(
           <div className="f">
             <label>Trạng thái</label>
-            <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               {STATUS_FLOW.map(s=>{
                 const[t,c]=STATUS_MAP[s];
                 return(
                   <button key={s} onClick={()=>setStatus(s)}
-                    style={{padding:"7px 12px",borderRadius:10,border:`2px solid ${P.ink}`,fontFamily:"Nunito",fontWeight:800,fontSize:11,cursor:"pointer",
-                      background:status===s?P.ink:P.card,color:status===s?"#fff":P.ink,
-                      boxShadow:status===s?`2px 2px 0 ${P.green}`:`2px 2px 0 ${P.ink}`}}>
+                    style={{padding:"7px 12px",borderRadius:10,border:`1.5px solid ${status===s?T.ink:T.border2}`,fontFamily:"Nunito",fontWeight:700,fontSize:11,cursor:"pointer",background:status===s?T.ink:"transparent",color:status===s?"#fff":T.muted,transition:"all .12s"}}>
                     {t}
                   </button>
                 );
@@ -415,411 +413,340 @@ function OrderForm({order, customers, services, onSave, onClose}) {
           </div>
         )}
 
-        {/* Tổng tiền preview */}
+        <div className="f">
+          <label>Ghi chú</label>
+          <textarea placeholder="Ghi chú về buổi xem..." value={notes} onChange={e=>setNotes(e.target.value)}/>
+        </div>
+
         {total>0&&(
-          <div className="box box-greenbg" style={{marginBottom:14}}>
-            <div style={{display:"flex",justifyContent:"space-between",fontFamily:"Nunito",fontWeight:900,fontSize:20,color:P.ink}}>
-              <span>TỔNG</span><span style={{color:P.green}}>{vnd(total)}</span>
-            </div>
+          <div className="card card-green" style={{marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{fontSize:12,fontWeight:700,color:T.green}}>TỔNG TIỀN</div>
+            <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:22,color:T.ink}}>{vnd(total)}</div>
           </div>
         )}
+
+        {err&&<div style={{color:T.red,fontSize:13,fontWeight:600,marginBottom:10}}>⚠️ {err}</div>}
 
         <div style={{display:"flex",gap:8,marginBottom:8}}>
-          <button className="btn btn-g" style={{flex:2}} onClick={save}>{isEdit?"💾 Lưu thay đổi":"📋 Tạo đơn"}</button>
-          <button className="btn btn-gh" style={{flex:1}} onClick={onClose}>Huỷ</button>
+          <button className="btn btn-primary" style={{flex:2}} onClick={save}>{isEdit?"Lưu thay đổi":"Tạo đơn"}</button>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Huỷ</button>
         </div>
       </div>
     </div>
   );
 }
 
-// ── ORDER DETAIL ──────────────────────────────────────────────────────────────
-function OrderDetail({order, customers, services, onUpdate, onClose, toast}) {
-  const [tipsInput, setTipsInput] = useState("");
-  const [showTipsEdit, setShowTipsEdit] = useState(false);
-  const [showInvoice, setShowInvoice] = useState(false);
-  const [editing, setEditing] = useState(false);
-
-  const cust = customers.find(c=>c.id===order.custId);
-
-  const nextStatus = () => {
-    const idx = STATUS_FLOW.indexOf(order.status);
-    const next = STATUS_FLOW[Math.min(idx+1, STATUS_FLOW.length-2)];
-    onUpdate({...order, status:next});
-    toast(`✅ Đã chuyển sang: ${STATUS_MAP[next][0]}`);
-  };
-
-  const addTips = () => {
-    const t = parseInt(tipsInput)||0;
-    if(!t) return;
-    onUpdate({...order, tips:(order.tips||0)+t});
-    setTipsInput(""); setShowTipsEdit(false);
-    toast(`💜 Đã ghi nhận tips ${vnd(t)}!`);
-  };
-
-  const cancelOrder = () => {
-    onUpdate({...order, status:"cancel"});
-    toast("🗑 Đã huỷ đơn!"); onClose();
-  };
-
-  if(editing) return(
-    <OrderForm order={order} customers={customers} services={services}
-      onSave={o=>{onUpdate(o);setEditing(false);toast("✅ Đã cập nhật đơn!");}}
-      onClose={()=>setEditing(false)}/>
-  );
-
-  return(
-    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="sheet">
-        <div className="drag"/>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-          <div className="mh" style={{marginBottom:0}}>Chi tiết đơn</div>
-          <div style={{display:"flex",gap:6}}>
-            <button className="btn-xs btn btn-y" onClick={()=>setEditing(true)}>✏️ Sửa</button>
-            {order.status!=="cancel"&&order.status!=="paid"&&(
-              <button className="btn-xs btn" style={{background:"#FFE4E4"}} onClick={cancelOrder}>🗑 Huỷ</button>
-            )}
-          </div>
-        </div>
-
-        {/* Khách */}
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,background:P.cloud,borderRadius:14,border:`2px solid ${P.ink}`,padding:12}}>
-          <div style={{fontSize:32}}>{cust?.ava||"👤"}</div>
-          <div>
-            <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:16}}>{cust?.name}</div>
-            <div style={{fontSize:12,fontWeight:600,color:P.muted}}>{cust?.nick} · {cust?.phone}</div>
-          </div>
-          <div style={{marginLeft:"auto"}}><Badge s={order.status}/></div>
-        </div>
-
-        {/* Items */}
-        {order.items.map((it,i)=>{
-          const svc=services.find(s=>s.id===it.svcId);
-          return svc?(
-            <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"8px 0",borderBottom:`1.5px dashed ${P.border}`}}>
-              <div>
-                <div style={{fontSize:14,fontWeight:700}}>{svc.ico} {svc.name}</div>
-                {svc.type==="per_q"&&<div style={{fontSize:11,fontWeight:600,color:P.muted}}>{it.qty} câu</div>}
-                {it.group&&<div style={{fontSize:11,fontWeight:600,color:P.purple}}>📌 {it.group}</div>}
-              </div>
-              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:P.green}}>
-                {svc.type==="fixed"?vnd(svc.price):vnd(calcQ(it.qty,svc.price,svc.price6))}
-              </div>
-            </div>
-          ):null;
-        })}
-        {order.extraQ>0&&(
-          <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1.5px dashed ${P.border}`}}>
-            <div style={{fontSize:14,fontWeight:700}}>💬 {order.extraQ} câu lẻ thêm</div>
-            <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:P.orange}}>{vnd(calcQ(order.extraQ,20000,15000))}</div>
-          </div>
-        )}
-
-        {/* Tổng */}
-        <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0 8px",borderTop:`2.5px solid ${P.ink}`}}>
-          <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:16}}>TỔNG XEM BÀI</div>
-          <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:20,color:P.green}}>{vnd(order.total)}</div>
-        </div>
-
-        {/* Tips */}
-        <div style={{background:order.tips>0?P.yellowbg:P.greenbg,borderRadius:12,border:`1.5px solid ${P.border}`,padding:12,marginBottom:12}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div>
-              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14}}>💜 Tips</div>
-              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:20,color:P.purple}}>{order.tips>0?vnd(order.tips):"Chưa có"}</div>
-            </div>
-            <button className="btn-xs btn" style={{background:P.purple,color:"#fff",borderColor:P.ink}}
-              onClick={()=>setShowTipsEdit(v=>!v)}>
-              {showTipsEdit?"Đóng":"+ Tips"}
-            </button>
-          </div>
-          {showTipsEdit&&(
-            <div style={{marginTop:10,display:"flex",gap:8}}>
-              <input type="number" placeholder="Số tiền tips..." value={tipsInput}
-                onChange={e=>setTipsInput(e.target.value)}
-                style={{flex:1,padding:"9px 12px",borderRadius:10,border:`2px solid ${P.ink}`,background:P.card,fontFamily:"Nunito Sans",fontSize:14,fontWeight:600,outline:"none"}}/>
-              <button className="btn-xs btn" style={{background:P.purple,color:"#fff"}} onClick={addTips}>Ghi</button>
-            </div>
-          )}
-        </div>
-
-        {/* Tổng cộng */}
-        <div style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderTop:`2.5px solid ${P.ink}`,marginBottom:14}}>
-          <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14}}>TỔNG CỘNG (+ tips)</div>
-          <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:22,color:P.ink}}>{vnd(order.total+(order.tips||0))}</div>
-        </div>
-
-        {order.notes&&(
-          <div style={{background:P.cloud,borderRadius:10,padding:10,marginBottom:12,fontSize:13,fontWeight:600,color:P.inkmid}}>
-            📝 {order.notes}
-          </div>
-        )}
-
-        {/* Actions */}
-        <div style={{fontSize:11,fontWeight:700,color:P.muted,marginBottom:8}}>{order.date} · {order.time}</div>
-
-        {order.status!=="paid"&&order.status!=="cancel"&&(
-          <button className="btn btn-g" style={{marginBottom:8}} onClick={nextStatus}>
-            {order.status==="new"?"▶ Bắt đầu xem bài":order.status==="view"?"✅ Xem xong":order.status==="done"?"💰 Đánh dấu đã thanh toán":""}
-          </button>
-        )}
-
-        <button className="btn btn-s" style={{marginBottom:8}} onClick={()=>setShowInvoice(true)}>
-          🧾 Xem & xuất hóa đơn
-        </button>
-
-        <button className="btn btn-gh" onClick={onClose}>Đóng</button>
-
-        {showInvoice&&(
-          <InvoiceView order={order} cust={cust} services={services} toast={toast} onClose={()=>setShowInvoice(false)}/>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── INVOICE VIEW — styled như mẫu navy/cam của Mitchi ────────────────────────
-const INV_NAVY = "#0D1B3E";
-const INV_RED  = "#C0392B";
-const INV_GOLD = "#E8C97A";
-
-function InvoiceView({order, cust, services, toast, onClose}) {
+// ── INVOICE VIEW ──────────────────────────────────────────────────────────────
+function InvoiceView({order, cust, services, toast, onClose, shop}) {
   const [qr, setQr] = useState("acb");
 
-  // Build invoice rows
   const rows = [];
-  order.items.forEach(it => {
-    const svc = services.find(s=>s.id===it.svcId);
-    if (!svc) return;
+  (order.items||[]).forEach(it => {
+    const svc = services.find(s=>s.id===it.svcId); if(!svc) return;
+    const q = parseInt(it.qty)||0;
     if (svc.type==="fixed") {
-      rows.push({ qty:1, desc:svc.name, unitPrice:svc.price, total:svc.price, group:it.group });
+      rows.push({qty:1, desc:svc.name, unit:svc.price, total:svc.price, group:it.group});
+    } else if (q<=5) {
+      rows.push({qty:q, desc:`${svc.name} (trong 5 câu đầu)`, unit:svc.price, total:q*svc.price, group:it.group});
+      rows.push({qty:0, desc:`${svc.name} (từ câu 6 trở đi)`, unit:svc.price6||svc.price, total:0, group:""});
     } else {
-      const q = parseInt(it.qty)||0;
-      if (q<=5) {
-        rows.push({ qty:q, desc:`${svc.name} (trong 5 câu đầu)`, unitPrice:svc.price, total:q*svc.price, group:it.group });
-        rows.push({ qty:0, desc:`${svc.name} (từ câu 6 trở đi)`, unitPrice:svc.price6||svc.price, total:0, group:"" });
-      } else {
-        rows.push({ qty:5, desc:`${svc.name} (trong 5 câu đầu)`, unitPrice:svc.price, total:5*svc.price, group:it.group });
-        rows.push({ qty:q-5, desc:`${svc.name} (từ câu 6 trở đi)`, unitPrice:svc.price6||svc.price, total:(q-5)*(svc.price6||svc.price), group:"" });
-      }
+      rows.push({qty:5, desc:`${svc.name} (trong 5 câu đầu)`, unit:svc.price, total:5*svc.price, group:it.group});
+      rows.push({qty:q-5, desc:`${svc.name} (từ câu 6 trở đi)`, unit:svc.price6||svc.price, total:(q-5)*(svc.price6||svc.price), group:""});
     }
   });
-  if (order.extraQ>0) {
+  if (parseInt(order.extraQ)>0) {
     const eq=parseInt(order.extraQ);
-    if(eq<=5) {
-      rows.push({qty:eq,desc:"Câu hỏi lẻ (trong 5 câu đầu)",unitPrice:20000,total:eq*20000,group:""});
-    } else {
-      rows.push({qty:5,desc:"Câu hỏi lẻ (trong 5 câu đầu)",unitPrice:20000,total:100000,group:""});
-      rows.push({qty:eq-5,desc:"Câu hỏi lẻ (từ câu 6 trở đi)",unitPrice:15000,total:(eq-5)*15000,group:""});
-    }
+    rows.push({qty:Math.min(eq,5),desc:"Câu lẻ thêm (câu 1–5)",unit:20000,total:Math.min(eq,5)*20000,group:""});
+    if(eq>5) rows.push({qty:eq-5,desc:"Câu lẻ thêm (câu 6+)",unit:15000,total:(eq-5)*15000,group:""});
   }
 
   const copyText = () => {
-    const lines = rows.map(r=>`${r.qty > 0 ? r.qty : 0} | ${r.desc} | ${vnd(r.unitPrice)} | ${vnd(r.total)}`).join("\n");
-    const txt = `🧾 HOÁ ĐƠN TẠM TÍNH — MITCHI THE MIGHTY\nNgày: ${order.date} ${order.time}\nKhách: ${cust?.name}\n\n${lines}\n\nTỔNG: ${vnd(order.total)}\n\nNgân hàng: ${qr==="acb"?"ACB (Á Châu)\nSố TK: 6205237\nTên chủ: TON NU HONG CHAU":"Vietcombank\nSố TK: ...\nTên chủ: TON NU HONG CHAU"}\n\nXIN CẢM ƠN QUÝ KHÁCH — HẸN GẶP LẠI!`;
-    navigator.clipboard?.writeText(txt);
+    const lines = rows.filter(r=>r.total>0).map(r=>`${r.qty} câu | ${r.desc} | ${vnd(r.unit)}/câu | ${vnd(r.total)}`).join("\n");
+    const bankInfo = qr==="acb" ? {name:"ACB (Á Châu)",no:shop?.acbNo||"6205237",owner:shop?.acbName||"TON NU HONG CHAU"} : {name:"Vietcombank",no:shop?.vcbNo||"-",owner:shop?.vcbName||"TON NU HONG CHAU"}; const bank = `${bankInfo.name}\nSố TK: ${bankInfo.no}\nTên: ${bankInfo.owner}`;
+    navigator.clipboard?.writeText(`🧾 HOÁ ĐƠN TẠM TÍNH — ${shop?.name||"MITCHI THE MIGHTY"}\n📅 ${order.date} ${order.time}\n👤 Khách: ${cust?.name}\n\n${lines}\n\n💰 TỔNG: ${vnd(order.total)}\n\n🏦 Ngân hàng: ${bank}\n\n✨ Xin cảm ơn quý khách — Hẹn gặp lại!`);
     toast("📋 Đã copy text hóa đơn!");
   };
 
   return(
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="sheet" style={{background:"#0a1628"}}>
-        <div className="drag" style={{background:"rgba(255,255,255,.2)",borderColor:"rgba(255,255,255,.3)"}}/>
+        <DragHandle/>
+        <div style={{fontFamily:"Nunito",fontSize:18,fontWeight:900,color:"#fff",marginBottom:16}}>🧾 Hóa Đơn</div>
 
-        {/* ── HÓA ĐƠN TEMPLATE ── */}
-        <div id="invoice-render" style={{
-          background:`linear-gradient(160deg, #0D1B3E 0%, #1a2d5a 100%)`,
-          borderRadius:16, overflow:"hidden", position:"relative",
-          border:"2px solid rgba(232,201,122,0.3)",
-        }}>
-          {/* Decorative dots top */}
-          <div style={{height:6,background:`repeating-linear-gradient(90deg,${INV_GOLD} 0,${INV_GOLD} 4px,transparent 4px,transparent 12px)`,opacity:.6}}/>
-
-          {/* Header */}
-          <div style={{padding:"20px 20px 16px",textAlign:"center",position:"relative"}}>
-            {/* Corner decorations */}
-            <div style={{position:"absolute",top:12,left:12,fontSize:18,color:INV_GOLD,opacity:.7}}>✦</div>
-            <div style={{position:"absolute",top:12,right:12,fontSize:18,color:INV_GOLD,opacity:.7}}>✦</div>
-
-            {/* Logo */}
-            <div style={{marginBottom:8}}>
-              <img src="/images/logo.jpg" alt="Mitchi Logo"
-                style={{width:70,height:70,objectFit:"contain",borderRadius:"50%",border:`2px solid ${INV_GOLD}`,background:"rgba(255,255,255,.05)"}}
-                onError={e=>{e.target.style.display="none";}}/>
-            </div>
-
-            <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:18,color:"#fff",letterSpacing:2,textTransform:"uppercase",marginBottom:2}}>
-              MITCHI THE MIGHTY
-            </div>
-            <div style={{fontSize:11,color:INV_GOLD,fontStyle:"italic",marginBottom:12,letterSpacing:1}}>
-              Tarot and Lenormand Reader
-            </div>
-
-            {/* Dotted divider */}
-            <div style={{borderTop:`1.5px dotted rgba(232,201,122,0.4)`,margin:"0 0 10px"}}/>
-
-            <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:22,color:"#fff",letterSpacing:1,marginBottom:12}}>
-              HOÁ ĐƠN TẠM TÍNH
-            </div>
-
-            {/* Date pill */}
-            <div style={{display:"inline-block",background:INV_RED,borderRadius:50,padding:"7px 20px",fontSize:13,fontWeight:700,color:"#fff",letterSpacing:.5}}>
-              Ngày: {order.date} {order.time}
-            </div>
-
-            {/* Moon decorations */}
-            <div style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",fontSize:28,opacity:.25}}>🌙</div>
-            <div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:22,opacity:.2}}>🌙</div>
+        <div className="inv-wrap">
+          <div style={{height:5,background:`repeating-linear-gradient(90deg,${T.gold} 0,${T.gold} 4px,transparent 4px,transparent 10px)`,opacity:.6}}/>
+          <div style={{padding:"18px 18px 14px",textAlign:"center",position:"relative"}}>
+            <div style={{position:"absolute",top:10,left:12,color:T.gold,opacity:.6,fontSize:16}}>✦</div>
+            <div style={{position:"absolute",top:10,right:12,color:T.gold,opacity:.6,fontSize:16}}>✦</div>
+            <img src="/images/logo.jpg" alt="Logo" style={{width:80,height:80,objectFit:"contain",borderRadius:12,marginBottom:8,display:"block",margin:"0 auto 8px"}}
+              onError={e=>{e.target.style.display="none";}}/>
+            <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:16,color:"#fff",letterSpacing:1.5,textTransform:"uppercase"}}>{shop?.name||"MITCHI THE MIGHTY"}</div>
+            <div style={{fontSize:11,color:T.gold,fontStyle:"italic",marginBottom:12}}>{shop?.tagline||"Tarot and Lenormand Reader"}</div>
+            <div style={{borderTop:"1px dotted rgba(232,201,122,.3)",marginBottom:10}}/>
+            <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:20,color:"#fff",marginBottom:10}}>HOÁ ĐƠN TẠM TÍNH</div>
+            <div style={{display:"inline-block",background:T.invRed,borderRadius:50,padding:"6px 18px",fontSize:12,fontWeight:700,color:"#fff"}}>{order.date} · {order.time}</div>
           </div>
 
-          {/* Dotted divider */}
-          <div style={{borderTop:`1.5px dotted rgba(232,201,122,0.3)`,margin:"0 20px 14px"}}/>
-
-          {/* Customer */}
-          <div style={{margin:"0 16px 12px",background:"rgba(255,255,255,.08)",borderRadius:10,padding:"8px 14px",border:"1px solid rgba(232,201,122,0.2)"}}>
-            <span style={{fontSize:14,fontWeight:800,color:"#fff"}}>Khách: {cust?.name}</span>
+          <div style={{margin:"0 16px 12px",background:"rgba(255,255,255,.07)",borderRadius:10,padding:"8px 12px",border:"1px solid rgba(232,201,122,.15)"}}>
+            <span style={{fontSize:14,fontWeight:700,color:"#fff"}}>Khách: {cust?.name}</span>
           </div>
 
-          {/* Table */}
-          <div style={{margin:"0 16px 16px",borderRadius:10,overflow:"hidden",border:`1px solid rgba(232,201,122,0.2)`}}>
-            {/* Table header */}
-            <div style={{display:"grid",gridTemplateColumns:"48px 1fr 80px 80px",background:INV_RED,padding:"10px 12px",gap:4}}>
-              {["Số câu","Mô tả sản phẩm","Giá","Tổng"].map(h=>(
-                <div key={h} style={{fontSize:11,fontWeight:800,color:"#fff",fontStyle:"italic",textAlign:h==="Số câu"?"center":"left"}}>{h}</div>
+          <div style={{margin:"0 16px 14px",borderRadius:10,overflow:"hidden",border:"1px solid rgba(232,201,122,.15)"}}>
+            <div style={{display:"grid",gridTemplateColumns:"44px 1fr 76px 76px",background:T.invRed,padding:"9px 10px",gap:4}}>
+              {["Câu","Mô tả","Giá","Tổng"].map(h=>(
+                <div key={h} style={{fontSize:11,fontWeight:800,color:"#fff",fontStyle:"italic"}}>{h}</div>
               ))}
             </div>
-            {/* Table rows */}
             {rows.map((r,i)=>(
-              <div key={i} style={{display:"grid",gridTemplateColumns:"48px 1fr 80px 80px",padding:"9px 12px",gap:4,background:i%2===0?"rgba(255,255,255,.04)":"rgba(255,255,255,.02)",borderTop:"1px solid rgba(232,201,122,.1)"}}>
-                <div style={{textAlign:"center",fontFamily:"Nunito",fontWeight:900,fontSize:15,color:r.total>0?INV_RED:"rgba(255,255,255,.4)"}}>{r.qty}</div>
+              <div key={i} style={{display:"grid",gridTemplateColumns:"44px 1fr 76px 76px",padding:"8px 10px",gap:4,background:i%2===0?"rgba(255,255,255,.04)":"rgba(255,255,255,.02)",borderTop:"1px solid rgba(232,201,122,.08)"}}>
+                <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:r.total>0?T.invRed:"rgba(255,255,255,.3)"}}>{r.qty}</div>
                 <div>
-                  <div style={{fontSize:12,fontWeight:600,color:"#fff"}}>{r.desc}</div>
-                  {r.group&&<div style={{fontSize:10,color:INV_GOLD,marginTop:2}}>📌 {r.group}</div>}
+                  <div style={{fontSize:11,fontWeight:600,color:"#fff",lineHeight:1.3}}>{r.desc}</div>
+                  {r.group&&<div style={{fontSize:9,color:T.gold,marginTop:2}}>📌 {r.group}</div>}
                 </div>
-                <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.7)"}}>{vnd(r.unitPrice)}</div>
-                <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:13,color:r.total>0?"#fff":"rgba(255,255,255,.3)"}}>{vnd(r.total)}</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,.6)",fontWeight:600}}>{vnd(r.unit)}</div>
+                <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:12,color:r.total>0?"#fff":"rgba(255,255,255,.3)"}}>{vnd(r.total)}</div>
               </div>
             ))}
-            {/* Total row */}
-            <div style={{display:"grid",gridTemplateColumns:"48px 1fr 80px 80px",padding:"10px 12px",gap:4,background:"rgba(192,57,43,.15)",borderTop:`2px solid rgba(232,201,122,.3)`}}>
-              <div/>
-              <div/>
-              <div style={{fontSize:13,fontWeight:900,color:INV_GOLD,textAlign:"right",paddingRight:8}}>Tổng</div>
-              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:INV_RED}}>{vnd(order.total)}</div>
+            <div style={{display:"grid",gridTemplateColumns:"44px 1fr 76px 76px",padding:"10px",gap:4,background:"rgba(192,57,43,.15)",borderTop:"1px solid rgba(232,201,122,.25)"}}>
+              <div/><div/>
+              <div style={{fontSize:13,fontWeight:900,color:T.gold}}>Tổng</div>
+              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:13,color:T.invRed}}>{vnd(order.total)}</div>
             </div>
           </div>
 
-          {/* QR + Bank info */}
-          <div style={{margin:"0 16px 16px",background:"rgba(255,255,255,.07)",borderRadius:12,border:"1px solid rgba(232,201,122,.2)",padding:14,display:"flex",gap:14,alignItems:"center"}}>
-            {/* QR image */}
-            <div style={{flexShrink:0}}>
-              <img src={qr==="acb"?"/images/qr-acb.jpg":"/images/qr-vcb.jpg"}
-                alt="QR" style={{width:90,height:90,borderRadius:10,objectFit:"cover",border:`2px solid ${INV_GOLD}`}}
-                onError={e=>{e.target.outerHTML=`<div style="width:90px;height:90px;background:rgba(255,255,255,.1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:32px;border:2px solid ${INV_GOLD}">📱</div>`;}}/>
-              <div style={{display:"flex",gap:4,marginTop:6,alignItems:"center",justifyContent:"center"}}>
-                <div style={{fontSize:9,fontWeight:700,color:"#1565C0",background:"#fff",borderRadius:4,padding:"2px 5px"}}>VIETQR</div>
-                <div style={{fontSize:9,fontWeight:700,color:INV_RED,background:"#fff",borderRadius:4,padding:"2px 5px"}}>napas 247</div>
-              </div>
-            </div>
-            {/* Bank info */}
+          <div style={{margin:"0 16px 14px",background:"rgba(255,255,255,.06)",borderRadius:12,border:"1px solid rgba(232,201,122,.15)",padding:12,display:"flex",gap:12,alignItems:"center"}}>
+            <img src={qr==="acb"?"/images/qr-acb.jpg":"/images/qr-vcb.jpg"} alt="QR"
+              style={{width:84,height:84,borderRadius:8,objectFit:"cover",border:`1.5px solid ${T.gold}`,flexShrink:0}}
+              onError={e=>{e.target.outerHTML=`<div style="width:84px;height:84px;background:rgba(255,255,255,.1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:28px;border:1.5px solid ${T.gold}">📱</div>`;}}/>
             <div>
-              <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:4}}>
-                Ngân hàng: {qr==="acb"?"ACB (Á Châu)":"Vietcombank"}
-              </div>
-              <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.8)",marginBottom:3}}>
-                Số tài khoản: {qr==="acb"?"6205237":"—"}
-              </div>
-              <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.8)"}}>
-                Tên chủ: TON NU HONG CHAU
-              </div>
+              <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:3}}>Ngân hàng: {qr==="acb"?(shop?.acbNo?"ACB — "+(shop?.acbName||""):"ACB (Á Châu)"):(shop?.vcbNo?"Vietcombank — "+(shop?.vcbName||""):"Vietcombank")}</div>
+              <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.75)",marginBottom:2}}>Số TK: {qr==="acb"?(shop?.acbNo||"6205237"):(shop?.vcbNo||"—")}</div>
+              <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.75)"}}>Chủ TK: {qr==="acb"?(shop?.acbName||"TON NU HONG CHAU"):(shop?.vcbName||"TON NU HONG CHAU")}</div>
             </div>
           </div>
 
-          {/* Dotted divider */}
-          <div style={{borderTop:`1.5px dotted rgba(232,201,122,0.3)`,margin:"0 20px 12px"}}/>
-
-          {/* Footer */}
-          <div style={{textAlign:"center",padding:"4px 20px 16px"}}>
-            <div style={{fontSize:13,fontWeight:900,color:"#fff",letterSpacing:2,textTransform:"uppercase",marginBottom:2}}>XIN CẢM ƠN QUÝ KHÁCH</div>
-            <div style={{fontSize:13,fontWeight:900,color:"#fff",letterSpacing:2,textTransform:"uppercase",marginBottom:8}}>HẸN GẶP LẠI</div>
-            <div style={{fontSize:16,opacity:.4}}>✦ ✦ ✦</div>
+          <div style={{textAlign:"center",padding:"4px 16px 14px"}}>
+            <div style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,.7)",textTransform:"uppercase",letterSpacing:1.5}}>{shop?.footer||"XIN CẢM ƠN QUÝ KHÁCH — HẸN GẶP LẠI"}</div>
           </div>
-
-          {/* Decorative dots bottom */}
-          <div style={{height:6,background:`repeating-linear-gradient(90deg,${INV_GOLD} 0,${INV_GOLD} 4px,transparent 4px,transparent 12px)`,opacity:.6}}/>
+          <div style={{height:5,background:`repeating-linear-gradient(90deg,${T.gold} 0,${T.gold} 4px,transparent 4px,transparent 10px)`,opacity:.6}}/>
         </div>
 
-        {/* QR switcher */}
-        <div style={{display:"flex",gap:8,margin:"14px 0 10px"}}>
+        <div style={{display:"flex",gap:8,margin:"14px 0 8px"}}>
           {["acb","vcb"].map(b=>(
             <button key={b} onClick={()=>setQr(b)}
-              style={{flex:1,padding:10,borderRadius:12,border:`2.5px solid ${qr===b?INV_GOLD:"rgba(255,255,255,.2)"}`,background:qr===b?"rgba(232,201,122,.15)":"transparent",fontFamily:"Nunito",fontWeight:800,fontSize:13,cursor:"pointer",color:qr===b?INV_GOLD:"rgba(255,255,255,.6)",transition:"all .15s"}}>
-              {b==="acb"?"🏦 ACB":"🏦 Vietcombank"}
+              style={{flex:1,padding:10,borderRadius:10,border:`1.5px solid ${qr===b?T.gold:"rgba(255,255,255,.2)"}`,background:qr===b?"rgba(232,201,122,.12)":"transparent",fontFamily:"Nunito",fontWeight:700,fontSize:13,cursor:"pointer",color:qr===b?T.gold:"rgba(255,255,255,.5)"}}>
+              {b==="acb"?"🏦 ACB":"🏦 VCB"}
             </button>
           ))}
         </div>
+        <button className="btn btn-yellow" style={{marginBottom:8}} onClick={copyText}>📋 Copy text gửi Zalo/Messenger</button>
+        <button className="btn btn-ghost" style={{color:"rgba(255,255,255,.5)",border:"1px solid rgba(255,255,255,.15)"}} onClick={onClose}>Đóng</button>
+      </div>
+    </div>
+  );
+}
 
-        {/* Action buttons */}
-        <div style={{display:"flex",gap:8,marginBottom:8}}>
-          <button className="btn" style={{flex:1,background:INV_RED,color:"#fff",border:`2.5px solid ${INV_GOLD}`,boxShadow:`3px 3px 0 rgba(232,201,122,.4)`}}
-            onClick={()=>toast("📸 Tính năng xuất PNG — cần html2canvas, sắp ra mắt!")}>
-            📸 Xuất PNG
-          </button>
-          <button className="btn" style={{flex:1,background:"rgba(255,255,255,.1)",color:"#fff",border:`2.5px solid rgba(255,255,255,.3)`,boxShadow:"none"}}
-            onClick={copyText}>
-            📋 Copy text
-          </button>
+// ── ORDER DETAIL ──────────────────────────────────────────────────────────────
+function OrderDetail({order, customers, services, onUpdate, onDelete, onClose, toast, shop}) {
+  const [tipsInput, setTipsInput] = useState("");
+  const [showTips,  setShowTips]  = useState(false);
+  const [showInv,   setShowInv]   = useState(false);
+  const [editing,   setEditing]   = useState(false);
+  const [confirm,   setConfirm]   = useState(false);
+
+  const cust = customers.find(c=>c.id===order.custId);
+
+  const advance = () => {
+    const idx = STATUS_FLOW.indexOf(order.status);
+    if (idx >= STATUS_FLOW.length-2) return;
+    const next = STATUS_FLOW[idx+1];
+    onUpdate({...order, status:next});
+    toast(`✅ ${STATUS_MAP[next][0]}`);
+  };
+
+  const addTips = () => {
+    const t = parseInt(tipsInput)||0;
+    if (!t) return;
+    onUpdate({...order, tips:(order.tips||0)+t});
+    setTipsInput(""); setShowTips(false);
+    toast(`💜 Ghi nhận tips ${vnd(t)}!`);
+  };
+
+  const nextLabel = () => {
+    const s = order.status;
+    if (s==="new") return "▶ Bắt đầu xem bài";
+    if (s==="view") return "✅ Xem xong";
+    if (s==="done") return "💰 Đã thanh toán";
+    return null;
+  };
+
+  if (editing) return <OrderForm order={order} customers={customers} services={services}
+    onSave={o=>{onUpdate(o);setEditing(false);toast("✅ Đã cập nhật đơn!");}}
+    onClose={()=>setEditing(false)}/>;
+
+  if (showInv) return <InvoiceView order={order} cust={cust} services={services} toast={toast} onClose={()=>setShowInv(false)} shop={shop}/>;
+
+  return(
+    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="sheet">
+        <DragHandle/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div className="sheet-title" style={{marginBottom:0}}>Chi tiết đơn</div>
+          <div style={{display:"flex",gap:6}}>
+            <button className="xs" onClick={()=>setEditing(true)}>✏️ Sửa</button>
+            {order.status!=="paid"&&order.status!=="cancel"&&(
+              <button className="xs xs-red" onClick={()=>setConfirm(true)}>🗑</button>
+            )}
+          </div>
         </div>
-        <button className="btn" style={{background:"transparent",color:"rgba(255,255,255,.5)",border:"1.5px solid rgba(255,255,255,.2)",boxShadow:"none"}} onClick={onClose}>Đóng</button>
+
+        {/* Khách */}
+        <div className="card card-blue" style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,padding:12}}>
+          <div style={{fontSize:28}}>{cust?.ava||"👤"}</div>
+          <div style={{flex:1}}>
+            <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{cust?.name}</div>
+            <div style={{fontSize:12,color:T.muted,marginTop:2}}>{cust?.nick} · {cust?.phone}</div>
+          </div>
+          <Badge s={order.status}/>
+        </div>
+
+        {/* Items */}
+        <div className="card" style={{marginBottom:12}}>
+          {order.items.map((it,i)=>{
+            const svc=services.find(s=>s.id===it.svcId); if(!svc) return null;
+            const amt=svc.type==="fixed"?svc.price:calcQ(it.qty,svc.price,svc.price6);
+            return(
+              <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"10px 0",borderBottom:i<order.items.length-1?`1px dashed ${T.border}`:"none"}}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:700}}>{svc.ico} {svc.name}{svc.type==="per_q"?` · ${it.qty} câu`:""}</div>
+                  {it.group&&<div style={{fontSize:11,color:T.purple,fontWeight:600,marginTop:2}}>📌 {it.group}</div>}
+                </div>
+                <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:T.green}}>{vnd(amt)}</div>
+              </div>
+            );
+          })}
+          {order.extraQ>0&&(
+            <div style={{display:"flex",justifyContent:"space-between",padding:"10px 0 0",borderTop:`1px dashed ${T.border}`}}>
+              <div style={{fontSize:14,fontWeight:700}}>💬 {order.extraQ} câu lẻ thêm</div>
+              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:T.green}}>{vnd(calcQ(order.extraQ,20000,15000))}</div>
+            </div>
+          )}
+          <div style={{display:"flex",justifyContent:"space-between",paddingTop:12,marginTop:8,borderTop:`1.5px solid ${T.ink}`}}>
+            <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>TỔNG XEM BÀI</div>
+            <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:20,color:T.green}}>{vnd(order.total)}</div>
+          </div>
+        </div>
+
+        {/* Tips */}
+        <div className="card card-purple" style={{marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:T.purple,marginBottom:4}}>💜 Tips nhận được</div>
+              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:22,color:T.purple}}>{order.tips>0?vnd(order.tips):"Chưa có"}</div>
+            </div>
+            <button className="xs xs-purple" onClick={()=>setShowTips(v=>!v)}>
+              {showTips?"Đóng":"+ Thêm tips"}
+            </button>
+          </div>
+          {showTips&&(
+            <div style={{marginTop:12,display:"flex",gap:8}}>
+              <input type="number" placeholder="Số tiền tips..." value={tipsInput}
+                onChange={e=>setTipsInput(e.target.value)}
+                style={{flex:1,padding:"9px 12px",borderRadius:10,border:`1.5px solid ${T.purple}`,background:T.card,fontFamily:"Nunito Sans",fontSize:14,fontWeight:600,outline:"none",color:T.ink}}/>
+              <button className="xs xs-purple" onClick={addTips}>Ghi nhận</button>
+            </div>
+          )}
+        </div>
+
+        {/* Total */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",background:T.ink,borderRadius:12,marginBottom:16}}>
+          <div style={{color:"rgba(255,255,255,.6)",fontSize:12,fontWeight:700}}>TỔNG CỘNG</div>
+          <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:22,color:"#fff"}}>{vnd(order.total+(order.tips||0))}</div>
+        </div>
+
+        {order.notes&&(
+          <div className="card" style={{marginBottom:12,fontSize:13,color:T.muted}}>📝 {order.notes}</div>
+        )}
+        <div style={{fontSize:11,color:T.muted,marginBottom:12}}>📅 {order.date} · {order.time}</div>
+
+        {/* Actions */}
+        {nextLabel()&&<button className="btn btn-green" style={{marginBottom:8}} onClick={advance}>{nextLabel()}</button>}
+        <button className="btn btn-outline" style={{marginBottom:8}} onClick={()=>setShowInv(true)}>🧾 Xem & xuất hóa đơn</button>
+        <button className="btn btn-ghost" onClick={onClose}>Đóng</button>
+
+        {/* Delete confirm */}
+        {confirm&&(
+          <div className="card card-red" style={{marginTop:12}}>
+            <div style={{fontWeight:700,marginBottom:10,color:T.red}}>Huỷ đơn này?</div>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-red" style={{flex:1}} onClick={()=>{onUpdate({...order,status:"cancel"});setConfirm(false);toast("🗑 Đã huỷ đơn!");}}>Huỷ đơn</button>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setConfirm(false)}>Không</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // ── ORDERS PAGE ───────────────────────────────────────────────────────────────
-function Orders({orders,setOrders,customers,services,toast}) {
-  const [filter,setFilter]=useState("all");
-  const [showNew,setShowNew]=useState(false);
-  const [selOrder,setSelOrder]=useState(null);
+function OrdersPage({orders, setOrders, saveOrder, customers, services, toast, defaultCustId, clearDefaultCust, shop}) {
+  const [filter,   setFilter]   = useState("all");
+  const [showNew,  setShowNew]  = useState(!!defaultCustId);
+  const [selId,    setSelId]    = useState(null);
+  const [search,   setSearch]   = useState("");
 
-  const shown=filter==="all"?orders:orders.filter(o=>o.status===filter);
+  useEffect(()=>{ if(defaultCustId) setShowNew(true); },[defaultCustId]);
 
-  const saveNew=(o)=>{setOrders(p=>[o,...p]);setShowNew(false);toast("🐸 Đã tạo đơn mới!");};
-  const updateOrder=(o)=>{setOrders(p=>p.map(x=>x.id===o.id?o:x));setSelOrder(o);};
+  const shown = orders.filter(o=>{
+    if (filter!=="all"&&o.status!==filter) return false;
+    if (search) {
+      const c = customers.find(x=>x.id===o.custId);
+      return c?.name.toLowerCase().includes(search.toLowerCase())||c?.nick.toLowerCase().includes(search.toLowerCase());
+    }
+    return true;
+  });
 
-  const cName=(id)=>customers.find(c=>c.id===id)?.name||"?";
-  const cAva=(id)=>customers.find(c=>c.id===id)?.ava||"👤";
+  const saveNew = o => { saveOrder(o); setShowNew(false); clearDefaultCust(); toast("✅ Đã tạo đơn!"); };
+  const upd = o => saveOrder(o);
+  const selOrder = orders.find(o=>o.id===selId);
+  const cName = id => customers.find(c=>c.id===id)?.name||"?";
+  const cAva  = id => customers.find(c=>c.id===id)?.ava||"👤";
+  const sName = id => { const s=services.find(x=>x.id===id); return s?`${s.ico} ${s.name}`:"?"; };
 
   return(
     <div className="scroll-body">
       <div className="hdr">
-        <div className="hdr-deco">📋</div>
         <div className="hdr-eye">Quản lý</div>
         <div className="hdr-h1">Đơn Xem Bói</div>
-        <div className="hdr-sub">{orders.length} đơn · Hôm nay: {vnd(orders.filter(o=>o.date===today()&&o.status==="paid").reduce((s,o)=>s+o.total,0))}</div>
+        <div className="hdr-sub">{orders.length} đơn · Hôm nay: {vnd(orders.filter(o=>o.date===todayStr()&&o.status==="paid").reduce((s,o)=>s+o.total,0))}</div>
       </div>
-      <input className="sb" placeholder="Tìm khách hàng..."/>
+
+      <input className="sb" placeholder="Tìm khách hàng..." value={search} onChange={e=>setSearch(e.target.value)}/>
+
       <div className="sec" style={{paddingTop:10}}>
         <div className="pill-row">
-          {[{k:"all",l:"Tất cả"},{k:"new",l:"Mới"},{k:"view",l:"Đang xem"},{k:"done",l:"Xong"},{k:"paid",l:"Đã TT"}].map(x=>(
+          {[{k:"all",l:"Tất cả"},{k:"new",l:"Mới"},{k:"view",l:"Đang xem"},{k:"done",l:"Xong"},{k:"paid",l:"Đã TT"},{k:"cancel",l:"Huỷ"}].map(x=>(
             <button key={x.k} className={`pill ${filter===x.k?"on":""}`} onClick={()=>setFilter(x.k)}>{x.l}</button>
           ))}
         </div>
-        {shown.length===0&&<div style={{textAlign:"center",padding:24,color:P.muted,fontWeight:700}}>Không có đơn nào</div>}
+
+        {shown.length===0&&<EmptyState ico="📋" title="Không có đơn nào" sub="Nhấn + để tạo đơn mới"/>}
+
         {shown.map(o=>(
-          <div key={o.id} className="row" onClick={()=>setSelOrder(o)}>
-            <div className="ava" style={{background:P.cloud,fontSize:22,borderRadius:"50%"}}>{cAva(o.custId)}</div>
+          <div key={o.id} className="row" onClick={()=>setSelId(o.id)} style={{borderLeft:`3px solid ${o.status==="paid"?T.green:o.status==="cancel"?T.red:o.status==="done"?T.yellow:o.status==="view"?T.purple:T.blue}`}}>
+            <div className="ava" style={{borderRadius:"50%",fontSize:20}}>{cAva(o.custId)}</div>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:14,fontWeight:700,color:P.ink}}>{cName(o.custId)}</div>
-              <div style={{fontSize:11,fontWeight:600,color:P.muted,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-                {o.items.map(it=>services.find(s=>s.id===it.svcId)?.name).filter(Boolean).join(" + ")}
-                {o.extraQ>0&&` + ${o.extraQ}câu lẻ`}
+              <div style={{fontSize:14,fontWeight:700}}>{cName(o.custId)}</div>
+              <div style={{fontSize:11,color:T.muted,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                {o.items.map(it=>sName(it.svcId)).join(" + ")}{o.extraQ>0?` + ${o.extraQ}c lẻ`:""}
               </div>
-              <div style={{fontSize:10,fontWeight:700,color:P.muted}}>{o.date} · {o.time}</div>
+              <div style={{fontSize:10,color:T.muted}}>{o.date} · {o.time}</div>
             </div>
             <div style={{textAlign:"right",flexShrink:0}}>
-              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:P.ink}}>{vnd(o.total)}</div>
-              {o.tips>0&&<div style={{fontSize:10,fontWeight:800,color:P.purple}}>+{vnd(o.tips)} tips</div>}
+              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14}}>{vnd(o.total)}</div>
+              {o.tips>0&&<div style={{fontSize:10,fontWeight:700,color:T.purple}}>+{vnd(o.tips)} tips</div>}
               <Badge s={o.status}/>
             </div>
           </div>
@@ -828,160 +755,170 @@ function Orders({orders,setOrders,customers,services,toast}) {
 
       <button className="fab" onClick={()=>setShowNew(true)}>{I.plus}</button>
 
-      {showNew&&<OrderForm customers={customers} services={services} onSave={saveNew} onClose={()=>setShowNew(false)}/>}
-      {selOrder&&(
-        <OrderDetail
-          order={orders.find(o=>o.id===selOrder.id)||selOrder}
-          customers={customers} services={services}
-          onUpdate={updateOrder}
-          onClose={()=>setSelOrder(null)}
-          toast={toast}/>
-      )}
+      {showNew&&<OrderForm customers={customers} services={services} onSave={saveNew} onClose={()=>{setShowNew(false);clearDefaultCust();}} defaultCustId={defaultCustId}/>}
+      {selId&&selOrder&&<OrderDetail order={selOrder} customers={customers} services={services} onUpdate={upd} onClose={()=>setSelId(null)} toast={toast} shop={shop}/>}
     </div>
   );
 }
 
 // ── CUSTOMERS PAGE ────────────────────────────────────────────────────────────
-function Customers({customers,setCustomers,orders,services,toast,navToOrders}) {
-  const [sel,setSel]=useState(null);
-  const [modal,setModal]=useState(false);
-  const [editData,setEditData]=useState(null);
-  const [form,setForm]=useState({name:"",nick:"",phone:"",social:"",notes:"",ava:"🐸"});
-  const [delConfirm,setDelConfirm]=useState(false);
-  const AVAS=["🐸","🌸","⭐","🌙","🦋","🌺","🌊","💫","🔮","🌈"];
+function CustomersPage({customers, setCustomers, orders, services, toast, onCreateOrder}) {
+  const [sel,     setSel]     = useState(null);
+  const [modal,   setModal]   = useState(false);
+  const [editC,   setEditC]   = useState(null);
+  const [delConf, setDelConf] = useState(false);
+  const [tab,     setTab]     = useState("all");
+  const [search,  setSearch]  = useState("");
+  const [form,    setForm]    = useState({name:"",nick:"",phone:"",social:"",notes:"",ava:"🌙"});
 
-  const openNew=()=>{ setForm({name:"",nick:"",phone:"",social:"",notes:"",ava:"🐸"}); setEditData(null); setModal(true); };
-  const openEdit=(c)=>{ setForm({name:c.name,nick:c.nick,phone:c.phone,social:c.social||"",notes:c.notes||"",ava:c.ava}); setEditData(c); setModal(true); };
+  const custOrders = id => orders.filter(o=>o.custId===id);
+  const totalSpent = id => custOrders(id).filter(o=>o.status==="paid").reduce((s,o)=>s+o.total,0);
+  const totalTips  = id => custOrders(id).reduce((s,o)=>s+(o.tips||0),0);
+  const lastOrder  = id => { const ords=custOrders(id); return ords.length?ords[ords.length-1].date:"-"; };
+  const daysSince  = dateStr => {
+    if(!dateStr||dateStr==="-") return 999;
+    const [d,m,y]=dateStr.split("/").map(Number);
+    const diff=new Date()-new Date(y,m-1,d);
+    return Math.floor(diff/(1000*60*60*24));
+  };
 
-  const save=()=>{
-    if(!form.name.trim()){alert("Nhập tên khách!");return;}
-    if(editData){
-      setCustomers(p=>p.map(c=>c.id===editData.id?{...c,...form}:c));
-      toast("✅ Đã cập nhật khách hàng!");
+  const needsFollowUp = c => daysSince(c.lastOrder||lastOrder(c.id)) > 21 && custOrders(c.id).length > 0;
+  const isVip = c => totalSpent(c.id)>500000||custOrders(c.id).length>=5||totalTips(c.id)>100000;
+  const autoTags = c => {
+    const tags=[...(c.tags||[]).filter(t=>!["vip","tip"].includes(t))];
+    if(isVip(c)&&!tags.includes("vip")) tags.push("vip");
+    if(totalTips(c.id)>0&&!tags.includes("tip")) tags.push("tip");
+    return tags;
+  };
+  const TAG_MAP = {vip:["👑 VIP","tg-vip"],new:["✨ Mới","tg-new"],fu:["📌 Follow","tg-fu"],old:["🔄 Cũ","tg-old"],tip:["💜 Tipper","tg-tip"]};
+
+  const openNew  = () => { setForm({name:"",nick:"",phone:"",social:"",notes:"",ava:"🌙"}); setEditC(null); setModal(true); };
+  const openEdit = c => { setForm({name:c.name,nick:c.nick||"",phone:c.phone||"",social:c.social||"",notes:c.notes||"",ava:c.ava||"🌙"}); setEditC(c); setModal(true); };
+
+  const save = () => {
+    if(!form.name.trim()) return;
+    if(editC) {
+      setCustomers(p=>p.map(c=>c.id===editC.id?{...c,...form}:c));
+      toast("✅ Đã cập nhật!");
     } else {
-      setCustomers(p=>[{id:uid(),...form,tags:["new"],created:today()},...p]);
-      toast("🐸 Đã thêm khách mới!");
+      const nc={id:uid(),...form,tags:["new"],created:todayStr(),lastOrder:""};
+      setCustomers(p=>[nc,...p]);
+      toast("✅ Đã thêm khách mới!");
     }
     setModal(false);
   };
 
-  const del=(id)=>{ setCustomers(p=>p.filter(c=>c.id!==id)); setSel(null); toast("🗑 Đã xoá khách!"); };
+  const del = id => { setCustomers(p=>p.filter(c=>c.id!==id)); setSel(null); setDelConf(false); toast("🗑 Đã xoá!"); };
 
-  const custOrders=(id)=>orders.filter(o=>o.custId===id);
-  const totalSpent=(id)=>custOrders(id).filter(o=>o.status==="paid").reduce((s,o)=>s+o.total,0);
-  const totalTips=(id)=>custOrders(id).reduce((s,o)=>s+(o.tips||0),0);
+  const filtered = customers.filter(c=>{
+    if(tab==="vip"&&!isVip(c)) return false;
+    if(tab==="fu"&&!needsFollowUp(c)) return false;
+    if(tab==="new"&&!c.tags?.includes("new")) return false;
+    if(search&&!c.name.toLowerCase().includes(search.toLowerCase())&&!c.nick?.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
 
-  const autoTags=(c)=>{
-    const tags=[...c.tags.filter(t=>!["vip","tip"].includes(t))];
-    if(totalSpent(c.id)>500000||custOrders(c.id).length>=5) { if(!tags.includes("vip")) tags.push("vip"); }
-    if(totalTips(c.id)>0) { if(!tags.includes("tip")) tags.push("tip"); }
-    return tags;
-  };
-
-  if(sel){
+  if(sel) {
     const c=customers.find(x=>x.id===sel);
-    if(!c){setSel(null);return null;}
+    if(!c) { setSel(null); return null; }
     const co=custOrders(c.id);
-    const ts=totalSpent(c.id);
-    const tt=totalTips(c.id);
     const tags=autoTags(c);
+    const ds=daysSince(c.lastOrder||lastOrder(c.id));
     return(
       <div className="scroll-body">
-        <div className="hdr" style={{paddingTop:40}}>
+        <div className="hdr" style={{paddingTop:44}}>
           <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:8}}>
-            <button onClick={()=>setSel(null)} style={{background:"rgba(255,255,255,.3)",border:`2px solid ${P.ink}`,borderRadius:12,padding:"6px 12px",fontFamily:"Nunito",fontWeight:900,fontSize:14,cursor:"pointer",boxShadow:`2px 2px 0 ${P.ink}`}}>← Back</button>
+            <button onClick={()=>setSel(null)} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",borderRadius:10,padding:"6px 12px",color:"#fff",cursor:"pointer",fontFamily:"Nunito",fontWeight:700,fontSize:13}}>← Quay lại</button>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:14}}>
+            <div style={{fontSize:44}}>{c.ava}</div>
             <div>
               <div className="hdr-h1">{c.nick||c.name}</div>
               <div className="hdr-sub">{c.name} · {c.phone}</div>
             </div>
           </div>
         </div>
+
         <div className="sec">
-          <div className="box" style={{textAlign:"center",padding:"20px 16px",marginBottom:12}}>
-            <div style={{fontSize:52,marginBottom:8}}>{c.ava}</div>
-            <div style={{fontFamily:"Nunito",fontSize:20,fontWeight:900}}>{c.nick||c.name}</div>
-            <div style={{fontSize:12,fontWeight:700,color:P.muted,margin:"4px 0 8px"}}>{c.phone}{c.social&&` · ${c.social}`}</div>
-            <div style={{marginBottom:8}}>
-              {tags.map(t=>{const[l,cl]=TAG_MAP[t]||[t,"tg-new"];return<span key={t} className={`tg ${cl}`}>{l}</span>;})}
-            </div>
-            {c.notes&&<div style={{fontSize:12,fontWeight:600,color:P.muted,background:P.bg,borderRadius:8,padding:"6px 10px"}}>{c.notes}</div>}
+          {/* Tags */}
+          <div style={{marginBottom:14,display:"flex",flexWrap:"wrap",gap:4}}>
+            {tags.map(t=>{const[l,cl]=TAG_MAP[t]||[t,"tg-new"];return<span key={t} className={`tg ${cl}`}>{l}</span>;})}
+            {needsFollowUp(c)&&<span className="tg tg-fu">⚠️ {ds}ngày chưa quay lại</span>}
           </div>
 
-          <div className="sg" style={{padding:0,marginBottom:14}}>
+          {/* Stats */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
             {[
-              {i:"🔮",n:co.length,  l:"Lần xem",   bg:P.cloud},
-              {i:"💰",n:vnd(ts),    l:"Đã chi",     bg:P.greenbg},
-              {i:"💜",n:vnd(tt),    l:"Tổng tips",  bg:"#F3E8FF"},
-              {i:"📋",n:co.filter(o=>o.status==="paid").length, l:"Đơn hoàn thành", bg:P.yellowbg},
+              {i:"🔮",l:"Lần xem",  v:co.length,         bg:T.bluebg},
+              {i:"💰",l:"Đã chi",   v:vnd(totalSpent(c.id)),bg:T.greenbg},
+              {i:"💜",l:"Tips",     v:vnd(totalTips(c.id)), bg:T.purplebg},
+              {i:"📅",l:"Lần cuối", v:`${ds<999?ds+"ngày":"Chưa có"}`, bg:T.yellowbg},
             ].map(s=>(
-              <div key={s.l} className="sc" style={{background:s.bg,textAlign:"center"}}>
-                <div className="sc-i">{s.i}</div>
-                <div className="sc-n" style={{fontSize:16}}>{s.n}</div>
-                <div className="sc-l">{s.l}</div>
+              <div key={s.l} className="metric-sm" style={{background:s.bg}}>
+                <div className="metric-sm-label">{s.i} {s.l}</div>
+                <div className="metric-sm-value" style={{fontSize:18}}>{s.v}</div>
               </div>
             ))}
           </div>
 
-          <div style={{display:"flex",gap:8,marginBottom:14}}>
-            <button className="btn btn-y" style={{flex:1}} onClick={()=>openEdit(c)}>✏️ Sửa thông tin</button>
-            <button className="btn btn-g" style={{flex:1}} onClick={()=>{setSel(null);navToOrders(c.id);}}>📋 Tạo đơn</button>
+          {/* Info */}
+          <div className="card" style={{marginBottom:14}}>
+            {[{l:"Điện thoại",v:c.phone},{l:"Zalo/Facebook",v:c.social||"—"},{l:"Ngày thêm",v:c.created}].map(x=>(
+              <div key={x.l} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px dashed ${T.border}`}}>
+                <span style={{fontSize:12,color:T.muted,fontWeight:600}}>{x.l}</span>
+                <span style={{fontSize:13,fontWeight:700}}>{x.v||"—"}</span>
+              </div>
+            ))}
+            {c.notes&&<div style={{marginTop:8,fontSize:13,color:T.muted}}>📝 {c.notes}</div>}
           </div>
 
-          <div className="sec-t" style={{marginBottom:10}}>📋 Lịch sử đơn</div>
-          {co.length===0&&<div style={{textAlign:"center",padding:16,color:P.muted,fontWeight:700}}>Chưa có đơn nào</div>}
+          {/* Action buttons */}
+          <div style={{display:"flex",gap:8,marginBottom:14}}>
+            <button className="btn btn-green" style={{flex:1}} onClick={()=>{setSel(null);onCreateOrder(c.id);}}>📋 Tạo đơn</button>
+            <button className="btn btn-outline" style={{flex:1}} onClick={()=>openEdit(c)}>✏️ Sửa</button>
+          </div>
+
+          {needsFollowUp(c)&&(
+            <div className="action-card action-card-yellow" style={{marginBottom:14}}>
+              <div style={{fontWeight:700,marginBottom:8}}>⚠️ {ds} ngày chưa quay lại — nên follow-up!</div>
+              <button className="xs xs-yellow" onClick={()=>{navigator.clipboard?.writeText(REPLIES[6].body);toast("📋 Copy tin follow-up!");}}>📋 Copy tin follow-up</button>
+            </div>
+          )}
+
+          {/* Order history */}
+          <div className="sec-h" style={{padding:0}}>
+            <div className="sec-t">📋 Lịch sử đơn ({co.length})</div>
+          </div>
+          {co.length===0&&<EmptyState ico="📋" title="Chưa có đơn nào"/>}
           {co.map(o=>(
             <div key={o.id} className="row" style={{cursor:"default"}}>
               <div style={{flex:1}}>
-                <div style={{fontSize:13,fontWeight:700}}>{o.items.map(it=>services.find(s=>s.id===it.svcId)?.name).filter(Boolean).join(" + ")}</div>
-                <div style={{fontSize:11,fontWeight:600,color:P.muted}}>{o.date} · {o.time}</div>
-                {o.items.map((it,i)=>it.group?<div key={i} style={{fontSize:10,color:P.purple,fontWeight:700}}>📌 {it.group}</div>:null)}
+                <div style={{fontSize:13,fontWeight:700}}>{o.items.map(it=>{const s=services.find(x=>x.id===it.svcId);return s?`${s.ico} ${s.name}`:""}).filter(Boolean).join(" + ")}</div>
+                <div style={{fontSize:11,color:T.muted}}>{o.date} · {o.time}</div>
+                {o.items.map((it,i)=>it.group?<span key={i} style={{fontSize:10,color:T.purple,fontWeight:600,marginRight:6}}>📌 {it.group}</span>:null)}
               </div>
               <div style={{textAlign:"right"}}>
                 <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14}}>{vnd(o.total)}</div>
-                {o.tips>0&&<div style={{fontSize:10,fontWeight:800,color:P.purple}}>+{vnd(o.tips)} 💜</div>}
+                {o.tips>0&&<div style={{fontSize:10,color:T.purple,fontWeight:700}}>+{vnd(o.tips)}</div>}
                 <Badge s={o.status}/>
               </div>
             </div>
           ))}
 
-          <div style={{height:12}}/>
-          <button className="btn" style={{background:P.card,color:P.red,border:`2.5px solid ${P.red}`,boxShadow:`3px 3px 0 ${P.red}`,fontFamily:"Nunito",fontWeight:900}}
-            onClick={()=>setDelConfirm(true)}>🗑 Xoá khách hàng</button>
-          {delConfirm&&(
-            <div style={{marginTop:10,background:"#FFE4E4",borderRadius:12,border:`2px solid ${P.red}`,padding:14}}>
-              <div style={{fontWeight:700,marginBottom:10,color:P.red}}>Xoá khách "{c.name}"? Không thể hoàn tác!</div>
+          <div style={{height:16}}/>
+          <button className="btn btn-ghost" style={{color:T.red,borderColor:T.red}} onClick={()=>setDelConf(true)}>🗑 Xoá khách hàng</button>
+          {delConf&&(
+            <div className="card card-red" style={{marginTop:10}}>
+              <div style={{fontWeight:700,color:T.red,marginBottom:10}}>Xoá "{c.name}"? Không thể hoàn tác!</div>
               <div style={{display:"flex",gap:8}}>
-                <button className="btn btn-r" style={{flex:1}} onClick={()=>del(c.id)}>Xoá luôn</button>
-                <button className="btn btn-gh" style={{flex:1}} onClick={()=>setDelConfirm(false)}>Huỷ</button>
+                <button className="btn btn-red" style={{flex:1}} onClick={()=>del(c.id)}>Xoá</button>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setDelConf(false)}>Huỷ</button>
               </div>
             </div>
           )}
         </div>
 
-        {modal&&(
-          <div className="overlay" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
-            <div className="sheet">
-              <div className="drag"/>
-              <div className="mh">Sửa khách hàng ✏️</div>
-              <div className="f"><label>Avatar</label>
-                <div className="ico-pick">{AVAS.map(a=>(
-                  <button key={a} className="ico-btn" onClick={()=>setForm(p=>({...p,ava:a}))}
-                    style={{border:`2.5px solid ${form.ava===a?P.ink:P.border}`,background:form.ava===a?P.yellow:P.card,boxShadow:form.ava===a?`2px 2px 0 ${P.ink}`:"none"}}>{a}</button>
-                ))}</div>
-              </div>
-              {[{l:"Tên đầy đủ",k:"name",p:"Nguyễn Văn A"},{l:"Nickname",k:"nick",p:"Bé A"},{l:"Số điện thoại",k:"phone",p:"0912345678",t:"tel"},{l:"Facebook / Zalo",k:"social",p:"Tên hoặc link"}].map(x=>(
-                <div className="f" key={x.k}><label>{x.l}</label>
-                  <input type={x.t||"text"} placeholder={x.p} value={form[x.k]} onChange={e=>setForm(p=>({...p,[x.k]:e.target.value}))}/>
-                </div>
-              ))}
-              <div className="f"><label>Ghi chú</label>
-                <textarea placeholder="Ghi chú về khách..." value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))}/>
-              </div>
-              <button className="btn btn-g" onClick={save} style={{marginBottom:8}}>💾 Lưu</button>
-              <button className="btn btn-gh" onClick={()=>setModal(false)}>Huỷ</button>
-            </div>
-          </div>
-        )}
+        {modal&&<CustomerModal form={form} setForm={setForm} onSave={save} onClose={()=>setModal(false)} isEdit={!!editC}/>}
       </div>
     );
   }
@@ -989,96 +926,141 @@ function Customers({customers,setCustomers,orders,services,toast,navToOrders}) {
   return(
     <div className="scroll-body">
       <div className="hdr">
-        <div className="hdr-deco">👥</div>
         <div className="hdr-eye">Danh sách</div>
         <div className="hdr-h1">Khách Hàng</div>
-        <div className="hdr-sub">{customers.length} khách · {customers.filter(c=>autoTags(c).includes("vip")).length} VIP</div>
+        <div className="hdr-sub">{customers.length} khách · {customers.filter(c=>isVip(c)).length} VIP · {customers.filter(c=>needsFollowUp(c)).length} cần follow-up</div>
       </div>
-      <input className="sb" placeholder="Tìm tên, số điện thoại..."/>
+
+      <input className="sb" placeholder="Tìm tên, số điện thoại..." value={search} onChange={e=>setSearch(e.target.value)}/>
+
       <div className="sec" style={{paddingTop:10}}>
         <div className="pill-row">
-          {["Tất cả","👑 VIP","✨ Mới","📌 Follow-up","💜 Tips"].map(f=>(
-            <button key={f} className={`pill ${f==="Tất cả"?"on":""}`}>{f}</button>
+          {[{k:"all",l:"Tất cả"},{k:"vip",l:"👑 VIP"},{k:"fu",l:"📌 Follow-up"},{k:"new",l:"✨ Mới"}].map(x=>(
+            <button key={x.k} className={`pill ${tab===x.k?"on":""}`} onClick={()=>setTab(x.k)}>{x.l}</button>
           ))}
         </div>
-        {customers.map(c=>{
-          const co=custOrders(c.id);
-          const ts=totalSpent(c.id);
-          const tt=totalTips(c.id);
-          const tags=autoTags(c);
+
+        {/* Follow-up alert */}
+        {tab==="all"&&customers.filter(c=>needsFollowUp(c)).length>0&&(
+          <div className="action-card action-card-yellow" style={{marginBottom:10}}>
+            <div style={{fontWeight:700,marginBottom:6}}>📌 {customers.filter(c=>needsFollowUp(c)).length} khách lâu chưa quay lại</div>
+            <button className="xs xs-yellow" onClick={()=>setTab("fu")}>Xem danh sách</button>
+          </div>
+        )}
+
+        {filtered.length===0&&<EmptyState ico="👥" title="Không có khách nào" sub="Nhấn + để thêm khách mới"/>}
+
+        {filtered.map(c=>{
+          const ts=totalSpent(c.id); const tt=totalTips(c.id); const tags=autoTags(c); const fu=needsFollowUp(c);
           return(
-            <div key={c.id} className="row" onClick={()=>setSel(c.id)}>
-              <div className="ava" style={{background:P.cloud,borderRadius:"50%",fontSize:22}}>{c.ava}</div>
+            <div key={c.id} className="row" onClick={()=>setSel(c.id)} style={{borderLeft:`3px solid ${isVip(c)?T.yellow:fu?T.red:T.border}`}}>
+              <div className="ava" style={{borderRadius:"50%",fontSize:22}}>{c.ava}</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:14,fontWeight:700}}>{c.nick||c.name}</div>
-                <div style={{fontSize:11,fontWeight:600,color:P.muted}}>{c.phone}</div>
-                <div>{tags.map(t=>{const[l,cl]=TAG_MAP[t]||[t,"tg-new"];return<span key={t} className={`tg ${cl}`}>{l}</span>;})}</div>
+                <div style={{fontSize:11,color:T.muted,marginTop:1}}>{c.phone}</div>
+                <div>{tags.slice(0,2).map(t=>{const[l,cl]=TAG_MAP[t]||[t,"tg-new"];return<span key={t} className={`tg ${cl}`}>{l}</span>;})}</div>
               </div>
               <div style={{textAlign:"right",flexShrink:0}}>
-                <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:P.green}}>{vnd(ts)}</div>
-                {tt>0&&<div style={{fontSize:10,fontWeight:800,color:P.purple}}>+{vnd(tt)} 💜</div>}
-                <div style={{fontSize:10,fontWeight:700,color:P.muted}}>{co.length} lần</div>
+                <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:T.green}}>{vnd(ts)}</div>
+                {tt>0&&<div style={{fontSize:10,color:T.purple,fontWeight:700}}>+{vnd(tt)}</div>}
+                <div style={{fontSize:10,color:T.muted}}>{custOrders(c.id).length} lần</div>
               </div>
             </div>
           );
         })}
       </div>
+
       <button className="fab" onClick={openNew}>{I.plus}</button>
-      {modal&&(
-        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
-          <div className="sheet">
-            <div className="drag"/>
-            <div className="mh">Thêm Khách Mới 🐸</div>
-            <div className="f"><label>Avatar</label>
-              <div className="ico-pick">{AVAS.map(a=>(
-                <button key={a} className="ico-btn" onClick={()=>setForm(p=>({...p,ava:a}))}
-                  style={{border:`2.5px solid ${form.ava===a?P.ink:P.border}`,background:form.ava===a?P.yellow:P.card,boxShadow:form.ava===a?`2px 2px 0 ${P.ink}`:"none"}}>{a}</button>
-              ))}</div>
-            </div>
-            {[{l:"Tên đầy đủ",k:"name",p:"Nguyễn Văn A"},{l:"Nickname",k:"nick",p:"Bé A"},{l:"Số điện thoại",k:"phone",p:"0912345678",t:"tel"},{l:"Facebook / Zalo",k:"social",p:"Tên hoặc link"}].map(x=>(
-              <div className="f" key={x.k}><label>{x.l}</label>
-                <input type={x.t||"text"} placeholder={x.p} value={form[x.k]} onChange={e=>setForm(p=>({...p,[x.k]:e.target.value}))}/>
-              </div>
-            ))}
-            <div className="f"><label>Ghi chú</label>
-              <textarea placeholder="Ghi chú về khách..." value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))}/>
-            </div>
-            <button className="btn btn-g" onClick={save} style={{marginBottom:8}}>🐸 Thêm khách</button>
-            <button className="btn btn-gh" onClick={()=>setModal(false)}>Huỷ</button>
-          </div>
+      {modal&&<CustomerModal form={form} setForm={setForm} onSave={save} onClose={()=>setModal(false)} isEdit={!!editC}/>}
+    </div>
+  );
+}
+
+function CustomerModal({form, setForm, onSave, onClose, isEdit}) {
+  return(
+    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="sheet">
+        <DragHandle/>
+        <div className="sheet-title">{isEdit?"Sửa khách hàng":"Thêm khách mới"}</div>
+        <div className="f">
+          <label>Avatar</label>
+          <div className="ico-pick">{AVAS.map(a=>(
+            <button key={a} className="ico-btn" onClick={()=>setForm(p=>({...p,ava:a}))}
+              style={{background:form.ava===a?T.ink:"transparent",border:`1.5px solid ${form.ava===a?T.ink:T.border}`}}>{a}</button>
+          ))}</div>
         </div>
-      )}
+        {[{l:"Tên đầy đủ",k:"name",p:"Nguyễn Thị A"},{l:"Nickname",k:"nick",p:"Bé A"},{l:"Số điện thoại",k:"phone",p:"0912345678",t:"tel"},{l:"Zalo / Facebook",k:"social",p:"Tên hoặc link"}].map(x=>(
+          <div className="f" key={x.k}>
+            <label>{x.l}</label>
+            <input type={x.t||"text"} placeholder={x.p} value={form[x.k]||""} onChange={e=>setForm(p=>({...p,[x.k]:e.target.value}))}/>
+          </div>
+        ))}
+        <div className="f">
+          <label>Ghi chú</label>
+          <textarea placeholder="Ghi chú về khách..." value={form.notes||""} onChange={e=>setForm(p=>({...p,notes:e.target.value}))}/>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn btn-primary" style={{flex:2}} onClick={onSave}>{isEdit?"Lưu thay đổi":"Thêm khách"}</button>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Huỷ</button>
+        </div>
+      </div>
     </div>
   );
 }
 
 // ── BOOKING PAGE ──────────────────────────────────────────────────────────────
-function Booking({bookings,setBookings,customers,services,toast}) {
-  const [modal,setModal]=useState(false);
-  const [form,setForm]=useState({custId:"",svc:"",date:today(),time:"",notes:"",status:"pending"});
-  const today2=new Date().getDate();
-  const fd=new Date(new Date().getFullYear(),new Date().getMonth(),1).getDay();
-  const dim=new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
-  const cells=Array(fd).fill(null).concat(Array.from({length:dim},(_,i)=>i+1));
-  const hasBk=(d)=>bookings.some(b=>b.date.startsWith(`${String(d).padStart(2,"0")}/${String(new Date().getMonth()+1).padStart(2,"0")}`));
-  const todayBks=bookings.filter(b=>b.date===today());
-  const cName=(id)=>customers.find(c=>c.id===id)?.name||"?";
-  const cAva=(id)=>customers.find(c=>c.id===id)?.ava||"👤";
-  const addBk=()=>{
-    if(!form.custId||!form.svc||!form.time){alert("Điền đầy đủ thông tin!");return;}
-    setBookings(p=>[...p,{id:uid(),...form}]);
-    setModal(false); toast("📅 Đã tạo booking mới!");
+function BookingPage({bookings, setBookings, customers, services, orders, setOrders, saveOrder, toast}) {
+  const [showNew,  setShowNew]  = useState(false);
+  const [selId,    setSelId]    = useState(null);
+  const [tab,      setTab]      = useState("today");
+  const [form,     setForm]     = useState({custId:"",svcId:"",date:todayStr(),time:"",notes:""});
+
+  const todayBks = bookings.filter(b=>b.date===todayStr());
+  const upcomBks = bookings.filter(b=>b.date!==todayStr());
+  const shown    = tab==="today"?todayBks:upcomBks;
+
+  const cName = id => customers.find(c=>c.id===id)?.name||"?";
+  const cAva  = id => customers.find(c=>c.id===id)?.ava||"👤";
+  const sName = id => { const s=services.find(x=>x.id===id); return s?`${s.ico} ${s.name}`:"Dịch vụ"; };
+
+  const today2 = new Date().getDate();
+  const fd  = new Date(new Date().getFullYear(),new Date().getMonth(),1).getDay();
+  const dim = new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
+  const cells = Array(fd).fill(null).concat(Array.from({length:dim},(_,i)=>i+1));
+  const hasBk = d => bookings.some(b=>{
+    const parts=b.date.split("/");
+    return parseInt(parts[0])===d&&parseInt(parts[1])===new Date().getMonth()+1;
+  });
+
+  const addBk = () => {
+    if(!form.custId||!form.svcId||!form.time) { alert("Điền đầy đủ thông tin!"); return; }
+    setBookings(p=>[...p,{id:uid(),...form,status:"pending"}]);
+    setShowNew(false); setForm({custId:"",svcId:"",date:todayStr(),time:"",notes:""});
+    toast("📅 Đã tạo booking!");
   };
-  const toggleStatus=(id)=>setBookings(p=>p.map(b=>b.id===id?{...b,status:b.status==="pending"?"confirmed":b.status==="confirmed"?"cancel":"pending"}:b));
+
+  const confirm = id => { setBookings(p=>p.map(b=>b.id===id?{...b,status:"confirmed"}:b)); toast("✅ Đã xác nhận!"); };
+  const cancel  = id => { setBookings(p=>p.map(b=>b.id===id?{...b,status:"cancel"}:b));    toast("🗑 Đã huỷ!"); };
+
+  const createOrderFromBk = bk => {
+    const o={id:uid(),custId:bk.custId,items:[{svcId:bk.svcId,qty:"",group:""}],extraQ:0,total:0,tips:0,status:"new",date:todayStr(),time:nowStr(),notes:bk.notes||""};
+    saveOrder(o);
+    toast("📋 Đã tạo đơn từ booking!");
+  };
+
+  const sendQR = bk => { navigator.clipboard?.writeText(REPLIES[3].body); toast("📋 Copy tin nhắn QR!"); };
+
+  const selBk = bookings.find(b=>b.id===selId);
 
   return(
     <div className="scroll-body">
       <div className="hdr">
-        <div className="hdr-deco">📅</div>
         <div className="hdr-eye">Lịch làm việc</div>
         <div className="hdr-h1">Booking</div>
-        <div className="hdr-sub">{new Date().toLocaleDateString("vi-VN",{month:"long",year:"numeric"})}</div>
+        <div className="hdr-sub">{todayBks.length} lịch hôm nay · {todayBks.filter(b=>b.status==="confirmed").length} đã xác nhận</div>
       </div>
+
+      {/* Mini calendar */}
       <div className="sec" style={{paddingTop:16}}>
         <div className="cal-hd">{["CN","T2","T3","T4","T5","T6","T7"].map(d=><div key={d} className="cal-dh">{d}</div>)}</div>
         <div className="cal-g">
@@ -1087,74 +1069,82 @@ function Booking({bookings,setBookings,customers,services,toast}) {
           ))}
         </div>
       </div>
+
       <div className="sec">
-        <div className="sec-h">
-          <div className="sec-t">📌 Hôm nay · {today()}</div>
-          <button className="btn-xs btn btn-g" onClick={()=>setModal(true)}>+ Booking</button>
+        <div className="pill-row">
+          <button className={`pill ${tab==="today"?"on":""}`} onClick={()=>setTab("today")}>Hôm nay ({todayBks.length})</button>
+          <button className={`pill ${tab==="upcoming"?"on":""}`} onClick={()=>setTab("upcoming")}>Sắp tới ({upcomBks.length})</button>
         </div>
-        {todayBks.length===0&&<div style={{textAlign:"center",padding:16,color:P.muted,fontWeight:700}}>Chưa có booking hôm nay</div>}
-        {todayBks.map(b=>(
-          <div key={b.id} className="row" style={{borderLeft:`4px solid ${b.status==="confirmed"?P.green:b.status==="cancel"?P.red:P.yellow}`}}>
-            <div style={{fontSize:24}}>{cAva(b.custId)}</div>
-            <div style={{flex:1}}>
-              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:17,color:P.ink}}>{b.time}</div>
-              <div style={{fontSize:14,fontWeight:700}}>{cName(b.custId)}</div>
-              <div style={{fontSize:11,fontWeight:600,color:P.muted}}>{b.svc}{b.notes&&` · ${b.notes}`}</div>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end"}}>
-              <span className={`bd ${b.status==="confirmed"?"bd-paid":b.status==="cancel"?"bd-can":"bd-pend"}`}>
-                {b.status==="confirmed"?"XÁC NHẬN":b.status==="cancel"?"HỦY":"CHỜ"}
+
+        {shown.length===0&&<EmptyState ico="📅" title={tab==="today"?"Hôm nay không có lịch":"Không có lịch sắp tới"} sub="Nhấn + để tạo booking mới"/>}
+
+        {shown.map(b=>(
+          <div key={b.id} className="action-card" style={{borderLeft:`4px solid ${b.status==="confirmed"?T.green:b.status==="cancel"?T.red:T.yellow}`,background:b.status==="cancel"?T.redbg:T.card}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+              <div style={{fontSize:24}}>{cAva(b.custId)}</div>
+              <div style={{flex:1}}>
+                <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{b.time} · {cName(b.custId)}</div>
+                <div style={{fontSize:12,color:T.muted}}>{sName(b.svcId)}{b.notes?` · ${b.notes}`:""}</div>
+              </div>
+              <span className={`bd ${b.status==="confirmed"?"bd-confirm":b.status==="cancel"?"bd-can":"bd-pend"}`}>
+                {b.status==="confirmed"?"XÁC NHẬN":b.status==="cancel"?"ĐÃ HUỶ":"CHỜ"}
               </span>
-              {b.status!=="cancel"&&<button className="btn-xs btn btn-y" style={{fontSize:10,padding:"4px 8px"}} onClick={()=>toggleStatus(b.id)}>
-                {b.status==="pending"?"✅ Xác nhận":"❌ Huỷ"}
-              </button>}
             </div>
-          </div>
-        ))}
-        <div style={{height:14}}/>
-        <div className="sec-t" style={{marginBottom:10}}>📅 Tất cả booking</div>
-        {bookings.filter(b=>b.date!==today()).map(b=>(
-          <div key={b.id} className="row" style={{borderLeft:`4px solid ${b.status==="confirmed"?P.green:P.yellow}`}}>
-            <div style={{fontSize:20}}>{cAva(b.custId)}</div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:13,fontWeight:700}}>{b.date} · {b.time}</div>
-              <div style={{fontSize:12,fontWeight:600,color:P.muted}}>{cName(b.custId)} · {b.svc}</div>
-            </div>
-            <span className={`bd ${b.status==="confirmed"?"bd-paid":"bd-pend"}`}>{b.status==="confirmed"?"XÁC NHẬN":"CHỜ"}</span>
+
+            {b.status!=="cancel"&&(
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {b.status==="pending"&&(
+                  <button className="xs xs-green" onClick={()=>confirm(b.id)}>✅ Xác nhận</button>
+                )}
+                <button className="xs xs-green" onClick={()=>createOrderFromBk(b)}>📋 Tạo đơn</button>
+                <button className="xs" onClick={()=>sendQR(b)}>📤 Gửi QR</button>
+                <button className="xs" onClick={()=>{navigator.clipboard?.writeText(REPLIES[4].body);toast("📋 Copy tin nhắc TT!");}}>💸 Nhắc TT</button>
+                {b.status!=="cancel"&&<button className="xs xs-red" onClick={()=>cancel(b.id)}>✕ Huỷ</button>}
+              </div>
+            )}
           </div>
         ))}
       </div>
-      <button className="fab" onClick={()=>setModal(true)}>{I.plus}</button>
-      {modal&&(
-        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
+
+      <button className="fab" onClick={()=>setShowNew(true)}>{I.plus}</button>
+
+      {showNew&&(
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setShowNew(false)}>
           <div className="sheet">
-            <div className="drag"/>
-            <div className="mh">Tạo Booking Mới 📅</div>
-            <div className="f"><label>Khách hàng</label>
+            <DragHandle/>
+            <div className="sheet-title">Tạo Booking Mới</div>
+            <div className="f">
+              <label>Khách hàng</label>
               <select value={form.custId} onChange={e=>setForm(p=>({...p,custId:e.target.value}))}>
                 <option value="">Chọn khách...</option>
                 {customers.map(c=><option key={c.id} value={c.id}>{c.ava} {c.name} – {c.nick}</option>)}
               </select>
             </div>
-            <div className="f"><label>Dịch vụ</label>
-              <select value={form.svc} onChange={e=>setForm(p=>({...p,svc:e.target.value}))}>
+            <div className="f">
+              <label>Dịch vụ</label>
+              <select value={form.svcId} onChange={e=>setForm(p=>({...p,svcId:e.target.value}))}>
                 <option value="">Chọn dịch vụ...</option>
-                {services.filter(s=>s.active).map(s=><option key={s.id} value={s.name}>{s.ico} {s.name}</option>)}
+                {services.filter(s=>s.active).map(s=><option key={s.id} value={s.id}>{s.ico} {s.name}</option>)}
               </select>
             </div>
             <div style={{display:"flex",gap:8}}>
-              <div className="f" style={{flex:1}}><label>Ngày</label>
-                <input type="text" placeholder="DD/MM/YYYY" value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value}))}/>
+              <div className="f" style={{flex:1}}>
+                <label>Ngày (DD/MM/YYYY)</label>
+                <input placeholder={todayStr()} value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value}))}/>
               </div>
-              <div className="f" style={{flex:1}}><label>Giờ</label>
+              <div className="f" style={{flex:1}}>
+                <label>Giờ</label>
                 <input type="time" value={form.time} onChange={e=>setForm(p=>({...p,time:e.target.value}))}/>
               </div>
             </div>
-            <div className="f"><label>Ghi chú</label>
+            <div className="f">
+              <label>Ghi chú</label>
               <textarea placeholder="Ghi chú..." value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))}/>
             </div>
-            <button className="btn btn-g" onClick={addBk} style={{marginBottom:8}}>📅 Tạo booking</button>
-            <button className="btn btn-gh" onClick={()=>setModal(false)}>Huỷ</button>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-primary" style={{flex:2}} onClick={addBk}>📅 Tạo booking</button>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setShowNew(false)}>Huỷ</button>
+            </div>
           </div>
         </div>
       )}
@@ -1162,87 +1152,371 @@ function Booking({bookings,setBookings,customers,services,toast}) {
   );
 }
 
-// ── MESSAGES PAGE ─────────────────────────────────────────────────────────────
-function Messages({toast}) {
+
+// ── MESSAGES PAGE — full CRUD + image attachments ─────────────────────────────
+function MessagesPage({toast, replies, setReplies}) {
+  const [expanded, setExpanded] = useState(null);
+  const [modal,    setModal]    = useState(false);
+  const [editId,   setEditId]   = useState(null);
+  const [delId,    setDelId]    = useState(null);
+  const [form,     setForm]     = useState({hash:"",title:"",body:"",images:[]});
+  const fileRef = useRef(null);
+
+  const openNew = () => {
+    setForm({hash:"",title:"",body:"",images:[]});
+    setEditId(null); setModal(true);
+  };
+  const openEdit = r => {
+    setForm({hash:r.hash,title:r.title,body:r.body,images:r.images||[]});
+    setEditId(r.id); setModal(true);
+  };
+
+  const save = () => {
+    if(!form.title.trim()||!form.body.trim()) { toast("⚠️ Điền đủ tiêu đề và nội dung!"); return; }
+    const entry = {...form, hash:form.hash||"#mau"+Date.now()};
+    if(editId) {
+      setReplies(p=>p.map(r=>r.id===editId?{...r,...entry}:r));
+      toast("✅ Đã cập nhật mẫu!");
+    } else {
+      setReplies(p=>[...p,{id:uid(),...entry}]);
+      toast("✅ Đã thêm mẫu mới!");
+    }
+    setModal(false);
+  };
+
+  const del = id => {
+    setReplies(p=>p.filter(r=>r.id!==id));
+    setDelId(null); setExpanded(null);
+    toast("🗑 Đã xoá mẫu!");
+  };
+
+  // Handle image upload — convert to base64 for in-memory storage
+  const handleImages = e => {
+    const files = Array.from(e.target.files||[]);
+    if(!files.length) return;
+    const remaining = 5 - (form.images||[]).length;
+    if(remaining<=0) { toast("⚠️ Tối đa 5 ảnh mỗi mẫu!"); return; }
+    const toProcess = files.slice(0, remaining);
+    let done = 0;
+    const newImgs = [];
+    toProcess.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        newImgs.push({name:file.name, dataUrl:ev.target.result, size:file.size});
+        done++;
+        if(done===toProcess.length) {
+          setForm(p=>({...p, images:[...(p.images||[]), ...newImgs]}));
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  };
+
+  const removeImg = (rId, imgIdx, isEdit) => {
+    if(isEdit) {
+      setForm(p=>({...p,images:p.images.filter((_,i)=>i!==imgIdx)}));
+    } else {
+      setReplies(p=>p.map(r=>r.id===rId?{...r,images:(r.images||[]).filter((_,i)=>i!==imgIdx)}:r));
+      toast("🗑 Đã xoá ảnh!");
+    }
+  };
+
+  // Download image
+  const downloadImg = (img) => {
+    const a = document.createElement("a");
+    a.href = img.dataUrl;
+    a.download = img.name||"image.jpg";
+    a.click();
+    toast("📥 Đang tải ảnh về...");
+  };
+
   return(
     <div className="scroll-body">
       <div className="hdr">
-        <div className="hdr-deco">💬</div>
-        <div className="hdr-eye">Copy 1 chạm</div>
+        <div className="hdr-eye">Quản lý mẫu</div>
         <div className="hdr-h1">Tin Nhắn Mẫu</div>
-        <div className="hdr-sub">{REPLIES.length} mẫu · Nhấn COPY là xong</div>
+        <div className="hdr-sub">{replies.length} mẫu · Nhấn để xem · Có thể đính kèm ảnh</div>
       </div>
+
       <div className="sec">
-        {REPLIES.map(r=>(
-          <div key={r.id} className="row" style={{cursor:"default",alignItems:"flex-start"}}>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:15,color:P.red,marginBottom:3}}>{r.hash}</div>
-              <div style={{fontSize:13,fontWeight:700,color:P.ink}}>{r.title}</div>
-              <div style={{fontSize:11,fontWeight:600,color:P.muted,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.body.split("\n")[0]}</div>
+        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
+          <button className="xs xs-green" onClick={openNew}>+ Thêm mẫu mới</button>
+        </div>
+
+        {replies.length===0&&<EmptyState ico="💬" title="Chưa có mẫu nào" sub="Nhấn + để tạo tin nhắn mẫu đầu tiên"/>}
+
+        {replies.map(r=>(
+          <div key={r.id} className="card" style={{marginBottom:10}}>
+            {/* Header row */}
+            <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>setExpanded(expanded===r.id?null:r.id)}>
+              <div style={{background:T.greenbg,borderRadius:8,padding:"5px 10px",fontFamily:"Nunito",fontWeight:800,fontSize:12,color:T.green,minWidth:80,textAlign:"center",flexShrink:0}}>
+                {r.hash}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:700,color:T.ink}}>{r.title}</div>
+                {expanded!==r.id&&<div style={{fontSize:11,color:T.muted,marginTop:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.body.split("\n")[0]}</div>}
+              </div>
+              <div style={{display:"flex",gap:5,flexShrink:0}}>
+                <button className="xs xs-green" style={{padding:"6px 11px"}} onClick={e=>{e.stopPropagation();navigator.clipboard?.writeText(r.body);toast("📋 Đã copy text!");}}>COPY</button>
+                <button className="xs" style={{padding:"6px 10px"}} onClick={e=>{e.stopPropagation();openEdit(r);}}>✏️</button>
+                <button className="xs xs-red" style={{padding:"6px 10px"}} onClick={e=>{e.stopPropagation();setDelId(r.id===delId?null:r.id);}}>🗑</button>
+              </div>
             </div>
-            <button className="btn-xs btn btn-y" style={{flexShrink:0,marginLeft:8}}
-              onClick={()=>{navigator.clipboard?.writeText(r.body);toast("📋 Đã copy!");}}>COPY</button>
+
+            {/* Delete confirm */}
+            {delId===r.id&&(
+              <div className="card card-red" style={{marginTop:10}}>
+                <div style={{fontSize:13,fontWeight:700,color:T.red,marginBottom:8}}>Xoá mẫu "{r.title}"?</div>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="xs xs-red" onClick={()=>del(r.id)}>Xoá</button>
+                  <button className="xs" onClick={()=>setDelId(null)}>Huỷ</button>
+                </div>
+              </div>
+            )}
+
+            {/* Expanded content */}
+            {expanded===r.id&&(
+              <div style={{marginTop:12}}>
+                <div style={{background:T.bg,borderRadius:10,padding:12,fontSize:13,color:T.ink,whiteSpace:"pre-line",lineHeight:1.6,fontWeight:500,marginBottom:(r.images||[]).length>0?10:0}}>
+                  {r.body}
+                </div>
+
+                {/* Image attachments */}
+                {(r.images||[]).length>0&&(
+                  <div>
+                    <div style={{fontSize:10,fontWeight:700,color:T.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>
+                      📎 Ảnh đính kèm ({r.images.length})
+                    </div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      {r.images.map((img,i)=>(
+                        <div key={i} style={{position:"relative",width:80,height:80}}>
+                          <img src={img.dataUrl} alt={img.name}
+                            style={{width:80,height:80,objectFit:"cover",borderRadius:10,border:`1.5px solid ${T.border}`}}/>
+                          <div style={{position:"absolute",bottom:0,left:0,right:0,display:"flex",gap:3,padding:4,background:"rgba(0,0,0,.5)",borderRadius:"0 0 8px 8px"}}>
+                            <button onClick={()=>downloadImg(img)}
+                              style={{flex:1,background:"rgba(255,255,255,.9)",border:"none",borderRadius:5,padding:"2px 0",fontSize:9,fontWeight:700,cursor:"pointer",color:T.ink}}>
+                              ⬇️
+                            </button>
+                            <button onClick={()=>removeImg(r.id,i,false)}
+                              style={{flex:1,background:"rgba(193,18,31,.8)",border:"none",borderRadius:5,padding:"2px 0",fontSize:9,fontWeight:700,cursor:"pointer",color:"#fff"}}>
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {/* Add more images button */}
+                      {r.images.length<5&&(
+                        <div style={{width:80,height:80,borderRadius:10,border:`2px dashed ${T.border2}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",background:T.bg}}
+                          onClick={()=>{setEditId(r.id);setForm({...r,images:r.images||[]});setTimeout(()=>fileRef.current?.click(),50);}}>
+                          <div style={{fontSize:22,color:T.muted}}>+</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add image if no images yet */}
+                {(r.images||[]).length===0&&(
+                  <button className="xs" style={{marginTop:6}}
+                    onClick={()=>{setEditId(r.id);setForm({...r,images:[]});setTimeout(()=>fileRef.current?.click(),50);}}>
+                    📎 Thêm ảnh đính kèm
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
+
+      {/* Hidden file input for add-image-from-expanded */}
+      <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}}
+        onChange={e=>{
+          if(!editId) return;
+          const files=Array.from(e.target.files||[]);
+          if(!files.length) return;
+          const cur = replies.find(r=>r.id===editId);
+          const remaining = 5 - (cur?.images||[]).length;
+          const toProcess = files.slice(0,remaining);
+          let done=0; const newImgs=[];
+          toProcess.forEach(file=>{
+            const reader=new FileReader();
+            reader.onload=ev=>{
+              newImgs.push({name:file.name,dataUrl:ev.target.result,size:file.size});
+              done++;
+              if(done===toProcess.length){
+                setReplies(p=>p.map(r=>r.id===editId?{...r,images:[...(r.images||[]),...newImgs]}:r));
+                toast("📸 Đã thêm ảnh!");
+                setEditId(null);
+              }
+            };
+            reader.readAsDataURL(file);
+          });
+          e.target.value="";
+        }}/>
+
+      {/* Add/Edit Modal */}
+      {modal&&(
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
+          <div className="sheet">
+            <DragHandle/>
+            <div className="sheet-title">{editId?"Sửa mẫu tin nhắn":"Thêm mẫu mới"}</div>
+
+            <div className="f">
+              <label>Hashtag (dùng để nhận ra nhanh)</label>
+              <input placeholder="#menu / #baogia / #camon..." value={form.hash} onChange={e=>setForm(p=>({...p,hash:e.target.value}))}/>
+            </div>
+            <div className="f">
+              <label>Tiêu đề</label>
+              <input placeholder="VD: Menu dịch vụ" value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))}/>
+            </div>
+            <div className="f">
+              <label>Nội dung tin nhắn</label>
+              <textarea style={{minHeight:120}} placeholder="Nhập nội dung..." value={form.body} onChange={e=>setForm(p=>({...p,body:e.target.value}))}/>
+            </div>
+
+            {/* Image upload */}
+            <div className="f">
+              <label>Ảnh đính kèm (tối đa 5 ảnh)</label>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+                {(form.images||[]).map((img,i)=>(
+                  <div key={i} style={{position:"relative",width:72,height:72}}>
+                    <img src={img.dataUrl} alt={img.name} style={{width:72,height:72,objectFit:"cover",borderRadius:10,border:`1.5px solid ${T.border}`}}/>
+                    <button onClick={()=>removeImg(null,i,true)}
+                      style={{position:"absolute",top:-6,right:-6,width:20,height:20,borderRadius:"50%",background:T.red,border:"none",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800}}>
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {(form.images||[]).length<5&&(
+                  <div style={{width:72,height:72,borderRadius:10,border:`2px dashed ${T.border2}`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer",background:T.bg,gap:2}}
+                    onClick={()=>document.getElementById("msg-img-upload")?.click()}>
+                    <div style={{fontSize:20,color:T.muted}}>📎</div>
+                    <div style={{fontSize:9,color:T.muted,fontWeight:700}}>Thêm ảnh</div>
+                  </div>
+                )}
+              </div>
+              <input id="msg-img-upload" type="file" accept="image/*" multiple style={{display:"none"}} onChange={handleImages}/>
+              {(form.images||[]).length>0&&(
+                <div style={{fontSize:11,color:T.muted}}>Nhấn ảnh để xem trước. Bấm ✕ để xoá.</div>
+              )}
+            </div>
+
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-primary" style={{flex:2}} onClick={save}>{editId?"Lưu thay đổi":"Thêm mẫu"}</button>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModal(false)}>Huỷ</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── REPORT PAGE ───────────────────────────────────────────────────────────────
-function Report({orders,customers,services}) {
-  const mx=Math.max(...WEEK.map(w=>w.v));
-  const COLS=[P.sky,P.green,P.yellow,P.orange,P.skydk,P.green,P.red];
-  const paidOrders=orders.filter(o=>o.status==="paid");
-  const totalRev=paidOrders.reduce((s,o)=>s+o.total,0);
-  const totalTips=orders.reduce((s,o)=>s+(o.tips||0),0);
-  const tipLeaders=[...customers].map(c=>({
-    ...c,
-    tips:orders.filter(o=>o.custId===c.id).reduce((s,o)=>s+(o.tips||0),0),
-    spent:orders.filter(o=>o.custId===c.id&&o.status==="paid").reduce((s,o)=>s+o.total,0),
-  })).filter(c=>c.tips>0).sort((a,b)=>b.tips-a.tips);
+function ReportPage({orders, customers, services}) {
+  const [period, setPeriod] = useState("month");
+  const paidOrders = orders.filter(o=>o.status==="paid");
+  const totalRev   = paidOrders.reduce((s,o)=>s+o.total,0);
+  const totalTips  = orders.reduce((s,o)=>s+(o.tips||0),0);
+  const activeOrders = orders.filter(o=>o.status!=="cancel");
 
-  const svcStats=services.map(s=>({
-    ...s,
-    rev:paidOrders.filter(o=>o.items.some(it=>it.svcId===s.id)).reduce((sum,o)=>{
-      const it=o.items.find(i=>i.svcId===s.id);
-      return sum+(it?(s.type==="fixed"?s.price:calcQ(it.qty,s.price,s.price6)):0);
-    },0),
-  })).filter(s=>s.rev>0).sort((a,b)=>b.rev-a.rev);
-  const maxRev=svcStats[0]?.rev||1;
+  // Repeat customers
+  const repeatCusts = customers.filter(c=>orders.filter(o=>o.custId===c.id).length>1);
+  const repeatRate  = customers.length>0?Math.round(repeatCusts.length/customers.length*100):0;
 
-  const groupStats=[];
-  orders.forEach(o=>o.items.forEach(it=>{
+  // Avg spend
+  const avgSpend = customers.length>0?Math.round(totalRev/customers.length):0;
+  const avgTips  = customers.length>0?Math.round(totalTips/customers.length):0;
+
+  // Service revenue
+  const svcStats = services.map(s=>{
+    const rev = paidOrders.reduce((sum,o)=>{
+      const it=o.items.find(i=>i.svcId===s.id); if(!it) return sum;
+      return sum+(s.type==="fixed"?s.price:calcQ(it.qty,s.price,s.price6));
+    },0);
+    const cnt = activeOrders.filter(o=>o.items.some(i=>i.svcId===s.id)).length;
+    const tipAvg = cnt>0?Math.round(paidOrders.filter(o=>o.items.some(i=>i.svcId===s.id)).reduce((sum,o)=>sum+(o.tips||0),0)/Math.max(cnt,1)):0;
+    const repCnt = customers.filter(c=>{const ords=orders.filter(o=>o.custId===c.id&&o.items.some(i=>i.svcId===s.id));return ords.length>1;}).length;
+    return {...s, rev, cnt, tipAvg, repRate:cnt>0?Math.round(repCnt/Math.max(cnt,1)*100):0};
+  }).filter(s=>s.cnt>0).sort((a,b)=>b.rev-a.rev);
+  const maxRev = svcStats[0]?.rev||1;
+
+  // Group stats
+  const groupStats = [];
+  activeOrders.forEach(o=>o.items.forEach(it=>{
     if(!it.group) return;
     const ex=groupStats.find(g=>g.n===it.group);
     if(ex) ex.c++; else groupStats.push({n:it.group,c:1});
   }));
   groupStats.sort((a,b)=>b.c-a.c);
-  const maxG=groupStats[0]?.c||1;
+
+  // Tips leaderboard
+  const tipsBoard = customers.map(c=>({
+    ...c,
+    tips:orders.filter(o=>o.custId===c.id).reduce((s,o)=>s+(o.tips||0),0),
+    spent:paidOrders.filter(o=>o.custId===c.id).reduce((s,o)=>s+o.total,0),
+    cnt:orders.filter(o=>o.custId===c.id).length,
+  })).filter(c=>c.tips>0||c.spent>0).sort((a,b)=>b.spent+b.tips-(a.spent+a.tips));
+
+  const WEEK_DATA = [320000,510000,280000,620000,450000,780000,590000];
+  const maxW = Math.max(...WEEK_DATA);
+
+  const COLS = [T.green,T.blue,T.yellow,T.green,T.greenlt,T.purple,T.red];
 
   return(
     <div className="scroll-body">
       <div className="hdr">
-        <div className="hdr-deco">📊</div>
-        <div className="hdr-eye">Thống kê</div>
+        <div className="hdr-eye">Analytics</div>
         <div className="hdr-h1">Báo Cáo</div>
         <div className="hdr-sub">Tháng {new Date().getMonth()+1}/{new Date().getFullYear()}</div>
       </div>
 
-      <div className="sg">
-        {[
-          {i:"💰",n:vnd(totalRev),  l:"Doanh thu xem bói",bg:P.greenbg},
-          {i:"💜",n:vnd(totalTips), l:"Tổng tiền tips",    bg:"#F3E8FF"},
-          {i:"📋",n:paidOrders.length,l:"Đơn hoàn thành",  bg:P.cloud},
-          {i:"🔄",n:customers.filter(c=>orders.filter(o=>o.custId===c.id).length>1).length,l:"Khách quay lại",bg:P.yellowbg},
-        ].map(s=><div key={s.l} className="sc" style={{background:s.bg}}><div className="sc-i">{s.i}</div><div className="sc-n">{s.n}</div><div className="sc-l">{s.l}</div></div>)}
+      {/* Period tabs */}
+      <div className="sec" style={{paddingTop:12}}>
+        <div className="pill-row">
+          {[{k:"week",l:"Tuần"},{k:"month",l:"Tháng"},{k:"all",l:"Tất cả"}].map(p=>(
+            <button key={p.k} className={`pill ${period===p.k?"on":""}`} onClick={()=>setPeriod(p.k)}>{p.l}</button>
+          ))}
+        </div>
       </div>
 
-      {/* Revenue vs Tips */}
+      {/* Revenue breakdown */}
       <div className="sec">
-        <div className="sec-t" style={{marginBottom:10}}>💰 Doanh thu vs Tips</div>
-        <div className="box">
-          {[{l:"Xem bói",v:totalRev,c:P.green},{l:"Tips",v:totalTips,c:P.purple}].map((r,i)=>(
+        <div className="metric-big" style={{marginBottom:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div>
+              <div className="metric-label">Doanh thu xem bói</div>
+              <div className="metric-value">{vnd(totalRev)}</div>
+              <div className="metric-sub">+ {vnd(totalTips)} tips</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:10,color:"rgba(255,255,255,.4)",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Tổng cộng</div>
+              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:22,color:T.yellow}}>{vnd(totalRev+totalTips)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+          {[
+            {l:"Đơn hoàn thành",v:paidOrders.length,ico:"📋",bg:T.greenbg},
+            {l:"Tỷ lệ quay lại",v:`${repeatRate}%`,ico:"🔄",bg:T.bluebg},
+            {l:"Chi tiêu TB",v:vnd(avgSpend),ico:"💰",bg:T.yellowbg},
+            {l:"Tips TB",v:vnd(avgTips),ico:"💜",bg:T.purplebg},
+          ].map(s=>(
+            <div key={s.l} className="metric-sm" style={{background:s.bg}}>
+              <div className="metric-sm-label">{s.ico} {s.l}</div>
+              <div className="metric-sm-value" style={{fontSize:18}}>{s.v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Revenue vs Tips bar */}
+      <div className="sec">
+        <div className="sec-h"><div className="sec-t">💰 Doanh thu vs Tips</div></div>
+        <div className="card">
+          {[{l:"Xem bói",v:totalRev,c:T.green},{l:"Tips",v:totalTips,c:T.purple}].map((r,i)=>(
             <div key={i} className="rb-row" style={{marginBottom:i===0?12:0}}>
               <div className="rb-lbl">{r.l}</div>
               <div className="rb-track"><div className="rb-fill" style={{width:`${Math.round(r.v/Math.max(totalRev,totalTips,1)*100)}%`,background:r.c}}/></div>
@@ -1252,50 +1526,42 @@ function Report({orders,customers,services}) {
         </div>
       </div>
 
-      {/* Tips leaderboard */}
-      {tipLeaders.length>0&&(
+      {/* Service analytics */}
+      {svcStats.length>0&&(
         <div className="sec">
-          <div className="sec-t" style={{marginBottom:10}}>💜 Top khách tips nhiều</div>
-          {tipLeaders.slice(0,5).map((c,i)=>(
-            <div key={c.id} className="row" style={{cursor:"default"}}>
-              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:20,color:[P.yellow,P.muted,P.orange][i]||P.muted,minWidth:28}}>#{i+1}</div>
-              <div className="ava" style={{background:P.cloud,borderRadius:"50%",fontSize:20}}>{c.ava}</div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:14,fontWeight:700}}>{c.nick||c.name}</div>
-                <div style={{fontSize:11,fontWeight:700,color:P.muted}}>Xem bói: {vnd(c.spent)}</div>
+          <div className="sec-h"><div className="sec-t">🏆 Phân tích dịch vụ</div></div>
+          {svcStats.map((s,i)=>(
+            <div key={s.id} className="card" style={{marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{fontSize:24}}>{s.ico}</div>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:700}}>{s.name}</div>
+                    <div style={{fontSize:11,color:T.muted}}>{s.cnt} đơn · tips TB {vnd(s.tipAvg)}</div>
+                  </div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:16,color:T.green}}>{vnd(s.rev)}</div>
+                  <div style={{fontSize:11,color:T.blue,fontWeight:600}}>{s.repRate}% quay lại</div>
+                </div>
               </div>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:15,color:P.purple}}>+{vnd(c.tips)}</div>
-                <div style={{fontSize:10,fontWeight:700,color:P.muted}}>tips</div>
+              <div className="rb-track" style={{height:6}}>
+                <div className="rb-fill" style={{width:`${Math.round(s.rev/maxRev*100)}%`,background:COLS[i]||T.green}}/>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Service stats */}
-      <div className="sec">
-        <div className="sec-t" style={{marginBottom:10}}>🏆 Dịch vụ doanh thu cao</div>
-        <div className="box">
-          {svcStats.map((s,i)=>(
-            <div key={s.id} className="rb-row" style={{marginBottom:i<svcStats.length-1?12:0}}>
-              <div className="rb-lbl">{s.ico} {s.name.replace("Tarot ","").replace("Lenormand ","")}</div>
-              <div className="rb-track"><div className="rb-fill" style={{width:`${Math.round(s.rev/maxRev*100)}%`,background:COLS[i]}}/></div>
-              <div className="rb-val">{vnd(s.rev)}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Question groups */}
+      {/* Group analytics */}
       {groupStats.length>0&&(
         <div className="sec">
-          <div className="sec-t" style={{marginBottom:10}}>❓ Chủ đề câu hỏi</div>
-          <div className="box">
-            {groupStats.slice(0,5).map((g,i)=>(
-              <div key={g.n} className="rb-row" style={{marginBottom:i<Math.min(groupStats.length,5)-1?10:0}}>
+          <div className="sec-h"><div className="sec-t">❓ Chủ đề câu hỏi phổ biến</div></div>
+          <div className="card">
+            {groupStats.slice(0,6).map((g,i)=>(
+              <div key={g.n} className="rb-row" style={{marginBottom:i<groupStats.length-1?10:0}}>
                 <div className="rb-lbl" style={{fontSize:11}}>{g.n}</div>
-                <div className="rb-track"><div className="rb-fill" style={{width:`${Math.round(g.c/maxG*100)}%`,background:COLS[i]}}/></div>
+                <div className="rb-track"><div className="rb-fill" style={{width:`${Math.round(g.c/groupStats[0].c*100)}%`,background:COLS[i]||T.green}}/></div>
                 <div className="rb-val">{g.c} đơn</div>
               </div>
             ))}
@@ -1303,11 +1569,39 @@ function Report({orders,customers,services}) {
         </div>
       )}
 
+      {/* Tips leaderboard → Khách thân thiết */}
+      {tipsBoard.length>0&&(
+        <div className="sec">
+          <div className="sec-h"><div className="sec-t">💎 Khách thân thiết</div></div>
+          {tipsBoard.slice(0,5).map((c,i)=>(
+            <div key={c.id} className="row" style={{cursor:"default"}}>
+              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:18,color:[T.yellow,T.muted,"#CD7F32"][i]||T.muted,minWidth:24}}>#{i+1}</div>
+              <div className="ava" style={{borderRadius:"50%",fontSize:20}}>{c.ava}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:700}}>{c.nick||c.name}</div>
+                <div style={{fontSize:11,color:T.muted}}>{c.cnt} lần xem · chi {vnd(c.spent)}</div>
+              </div>
+              {c.tips>0&&<div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:T.purple}}>+{vnd(c.tips)} tips</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 7-day bar chart */}
       <div className="sec">
-        <div className="sec-t" style={{marginBottom:10}}>📊 Doanh thu 7 ngày</div>
-        <div className="box">
+        <div className="sec-h"><div className="sec-t">📊 Doanh thu 7 ngày</div></div>
+        <div className="card">
           <div className="bc">
-            {WEEK.map((w,i)=><div key={w.d} className="bcol"><div className="bbar" style={{height:`${(w.v/mx)*74}px`,background:COLS[i]}}/><div className="blbl">{w.d}</div></div>)}
+            {WEEK_DAYS.map((d,i)=>(
+              <div key={d} className="bcol">
+                <div className="bbar" style={{height:`${(WEEK_DATA[i]/maxW)*70}px`,background:COLS[i],borderRadius:6,opacity:.85}}/>
+                <div className="blbl">{d}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:10,paddingTop:10,borderTop:`1px dashed ${T.border}`}}>
+            <div style={{fontSize:11,color:T.muted,fontWeight:600}}>Tổng tuần</div>
+            <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:T.green}}>{vnd(WEEK_DATA.reduce((s,v)=>s+v,0))}</div>
           </div>
         </div>
       </div>
@@ -1316,85 +1610,98 @@ function Report({orders,customers,services}) {
 }
 
 // ── SERVICE MANAGER ───────────────────────────────────────────────────────────
-function ServiceManager({services,setServices,toast}) {
-  const [modal,setModal]=useState(false);
-  const [editing,setEditing]=useState(null);
-  const [form,setForm]=useState({name:"",ico:"💜",type:"per_q",price:"",price6:"",dur:"60",active:true});
-  const [del,setDel]=useState(null);
-  const openNew=()=>{setForm({name:"",ico:"💜",type:"per_q",price:"",price6:"",dur:"60",active:true});setEditing(null);setModal(true);};
-  const openEdit=(s)=>{setForm({name:s.name,ico:s.ico,type:s.type,price:String(s.price),price6:String(s.price6||""),dur:String(s.dur||60),active:s.active});setEditing(s.id);setModal(true);};
-  const save=()=>{
-    if(!form.name.trim()||!form.price){toast("⚠️ Điền đủ tên và giá!");return;}
+function ServiceManager({services, setServices, toast}) {
+  const [modal,  setModal]  = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [delId,  setDelId]  = useState(null);
+  const [form,   setForm]   = useState({name:"",ico:"💜",type:"per_q",price:"",price6:"",dur:"60",active:true});
+
+  const openNew  = () => { setForm({name:"",ico:"💜",type:"per_q",price:"",price6:"",dur:"60",active:true}); setEditId(null); setModal(true); };
+  const openEdit = s => { setForm({name:s.name,ico:s.ico,type:s.type,price:String(s.price),price6:String(s.price6||""),dur:String(s.dur||60),active:s.active}); setEditId(s.id); setModal(true); };
+
+  const save = () => {
+    if(!form.name.trim()||!form.price) { toast("⚠️ Điền đủ tên và giá!"); return; }
     const d={...form,price:Number(form.price),price6:Number(form.price6)||0,dur:Number(form.dur)||60};
-    if(editing){setServices(p=>p.map(s=>s.id===editing?{...s,...d}:s));toast("✅ Đã cập nhật!");}
-    else{setServices(p=>[...p,{id:uid(),...d,sold:0}]);toast("✅ Đã thêm dịch vụ!");}
+    if(editId) { setServices(p=>p.map(s=>s.id===editId?{...s,...d}:s)); toast("✅ Đã cập nhật!"); }
+    else { setServices(p=>[...p,{id:uid(),...d,sold:0}]); toast("✅ Đã thêm dịch vụ!"); }
     setModal(false);
   };
-  const p1=Number(form.price)||0;const p6=Number(form.price6)||p1;
+
+  const p1=Number(form.price)||0; const p6=Number(form.price6)||p1;
+
   return(
     <>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-        <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:12,color:P.muted,textTransform:"uppercase",letterSpacing:1}}>Dịch vụ ({services.length})</div>
-        <button className="btn-xs btn btn-g" onClick={openNew}>+ Thêm dịch vụ</button>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontFamily:"Nunito",fontWeight:700,fontSize:11,color:T.muted,textTransform:"uppercase",letterSpacing:1}}>Dịch vụ ({services.length})</div>
+        <button className="xs xs-green" onClick={openNew}>+ Thêm dịch vụ</button>
       </div>
+
+      {services.length===0&&<EmptyState ico="✨" title="Chưa có dịch vụ nào"/>}
+
       {services.map(s=>(
-        <div key={s.id} style={{background:P.card,borderRadius:15,border:`2px solid ${P.ink}`,boxShadow:`3px 3px 0 ${P.ink}`,padding:"12px 14px",marginBottom:9}}>
+        <div key={s.id} className="card" style={{marginBottom:10,opacity:s.active?1:.6}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <div className="ava" style={{background:P.cloud,opacity:s.active?1:.5}}>{s.ico}</div>
+            <div className="ava" style={{fontSize:20}}>{s.ico}</div>
             <div style={{flex:1}}>
-              <div style={{fontSize:14,fontWeight:700,color:s.active?P.ink:P.muted}}>{s.name}</div>
-              <div style={{fontSize:11,fontWeight:600,color:P.muted}}>
-                {s.type==="fixed"?vnd(s.price):`${(s.price/1000).toFixed(0)}k/câu (1-5)${s.price6?` · ${(s.price6/1000).toFixed(0)}k (6+)`:""}`}
-                {s.dur?` · ${s.dur}p`:""}
+              <div style={{fontSize:14,fontWeight:700}}>{s.name}</div>
+              <div style={{fontSize:11,color:T.muted,marginTop:2}}>
+                {s.type==="fixed"?vnd(s.price):`${(s.price/1000).toFixed(0)}k/câu(1-5)${s.price6?` · ${(s.price6/1000).toFixed(0)}k(6+)`:""}`}
+                {s.dur?` · ${s.dur} phút`:""}
               </div>
             </div>
             <div style={{display:"flex",gap:6,alignItems:"center"}}>
-              <button className="btn-xs btn" style={{background:P.yellowbg,padding:"6px 10px"}} onClick={()=>openEdit(s)}>✏️</button>
-              <button className="btn-xs btn" style={{background:"#FFE4E4",padding:"6px 10px"}} onClick={()=>setDel(s.id===del?null:s.id)}>🗑</button>
+              <button className="xs" style={{padding:"6px 10px"}} onClick={()=>openEdit(s)}>✏️</button>
+              <button className="xs xs-red" style={{padding:"6px 10px"}} onClick={()=>setDelId(s.id===delId?null:s.id)}>🗑</button>
               <button className={`tog ${s.active?"on":"off"}`} onClick={()=>setServices(p=>p.map(x=>x.id===s.id?{...x,active:!x.active}:x))}/>
             </div>
           </div>
-          {del===s.id&&(
-            <div style={{marginTop:10,background:"#FFE4E4",borderRadius:10,padding:"10px 12px",display:"flex",justifyContent:"space-between",alignItems:"center",border:`1.5px solid ${P.red}`}}>
-              <span style={{fontSize:12,fontWeight:700,color:P.red}}>Xoá "{s.name}"?</span>
-              <div style={{display:"flex",gap:6}}>
-                <button className="btn-xs btn" style={{background:P.red,color:"#fff"}} onClick={()=>{setServices(p=>p.filter(x=>x.id!==s.id));setDel(null);toast("🗑 Đã xoá!");}}>Xoá</button>
-                <button className="btn-xs btn btn-gh" onClick={()=>setDel(null)}>Huỷ</button>
+          {delId===s.id&&(
+            <div className="card card-red" style={{marginTop:10}}>
+              <div style={{fontSize:13,fontWeight:700,color:T.red,marginBottom:8}}>Xoá "{s.name}"?</div>
+              <div style={{display:"flex",gap:8}}>
+                <button className="xs xs-red" onClick={()=>{setServices(p=>p.filter(x=>x.id!==s.id));setDelId(null);toast("🗑 Đã xoá!");}}>Xoá</button>
+                <button className="xs" onClick={()=>setDelId(null)}>Huỷ</button>
               </div>
             </div>
           )}
         </div>
       ))}
+
       {modal&&(
         <div className="overlay" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
           <div className="sheet">
-            <div className="drag"/>
-            <div className="mh">{editing?"Sửa dịch vụ ✏️":"Thêm dịch vụ 🐸"}</div>
-            <div className="f"><label>Icon</label>
+            <DragHandle/>
+            <div className="sheet-title">{editId?"Sửa dịch vụ":"Thêm dịch vụ mới"}</div>
+            <div className="f">
+              <label>Icon</label>
               <div className="ico-pick">{ICOS.map(ic=>(
                 <button key={ic} className="ico-btn" onClick={()=>setForm(p=>({...p,ico:ic}))}
-                  style={{border:`2.5px solid ${form.ico===ic?P.ink:P.border}`,background:form.ico===ic?P.yellow:P.card,boxShadow:form.ico===ic?`2px 2px 0 ${P.ink}`:"none"}}>{ic}</button>
+                  style={{background:form.ico===ic?T.ink:"transparent",border:`1.5px solid ${form.ico===ic?T.ink:T.border}`}}>{ic}</button>
               ))}</div>
             </div>
-            <div className="f"><label>Tên dịch vụ</label><input placeholder="VD: Tarot Tình Yêu" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))}/></div>
-            <div className="f"><label>Loại giá</label>
+            <div className="f"><label>Tên dịch vụ</label><input placeholder="Tarot Tình Yêu" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))}/></div>
+            <div className="f">
+              <label>Loại giá</label>
               <div style={{display:"flex",gap:8}}>
                 {[{k:"per_q",l:"💬 Theo câu"},{k:"fixed",l:"📦 Trọn gói"}].map(t=>(
                   <button key={t.k} onClick={()=>setForm(p=>({...p,type:t.k}))}
-                    style={{flex:1,padding:11,borderRadius:12,border:`2.5px solid ${form.type===t.k?P.ink:P.border}`,background:form.type===t.k?P.yellow:P.card,fontFamily:"Nunito",fontWeight:800,fontSize:13,cursor:"pointer",boxShadow:form.type===t.k?`2px 2px 0 ${P.ink}`:"none"}}>{t.l}</button>
+                    style={{flex:1,padding:11,borderRadius:12,border:`1.5px solid ${form.type===t.k?T.ink:T.border2}`,background:form.type===t.k?T.ink:"transparent",fontFamily:"Nunito",fontWeight:700,fontSize:13,cursor:"pointer",color:form.type===t.k?"#fff":T.muted}}>
+                    {t.l}
+                  </button>
                 ))}
               </div>
             </div>
             {form.type==="per_q"?(
               <>
-                <div className="f"><label>Giá câu 1-5 (VND/câu)</label><input type="number" placeholder="20000" value={form.price} onChange={e=>setForm(p=>({...p,price:e.target.value}))}/></div>
+                <div className="f"><label>Giá câu 1–5 (VND/câu)</label><input type="number" placeholder="20000" value={form.price} onChange={e=>setForm(p=>({...p,price:e.target.value}))}/></div>
                 <div className="f"><label>Giá câu 6+ (để trống = cùng giá)</label><input type="number" placeholder="15000" value={form.price6} onChange={e=>setForm(p=>({...p,price6:e.target.value}))}/></div>
                 {form.price&&(
-                  <div className="box box-greenbg" style={{marginBottom:12}}>
+                  <div className="card card-green" style={{marginBottom:12}}>
+                    <div style={{fontSize:10,fontWeight:700,color:T.green,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Xem trước tính tiền</div>
                     {[3,5,7,10].map(q=>{const amt=q<=5?q*p1:5*p1+(q-5)*p6;return(
-                      <div key={q} style={{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700,padding:"4px 0",borderBottom:`1px dashed ${P.border}`}}>
-                        <span style={{color:P.muted}}>{q} câu</span>
-                        <span style={{color:P.green,fontFamily:"Nunito",fontWeight:900}}>{vnd(amt)}</span>
+                      <div key={q} style={{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:600,padding:"4px 0",borderBottom:`1px dashed ${T.border}`}}>
+                        <span style={{color:T.muted}}>{q} câu</span>
+                        <span style={{fontFamily:"Nunito",fontWeight:800,color:T.green}}>{vnd(amt)}</span>
                       </div>
                     );})}
                   </div>
@@ -1404,9 +1711,9 @@ function ServiceManager({services,setServices,toast}) {
               <div className="f"><label>Giá trọn gói (VND)</label><input type="number" placeholder="100000" value={form.price} onChange={e=>setForm(p=>({...p,price:e.target.value}))}/></div>
             )}
             <div className="f"><label>Thời lượng (phút)</label><input type="number" placeholder="60" value={form.dur} onChange={e=>setForm(p=>({...p,dur:e.target.value}))}/></div>
-            <div style={{display:"flex",gap:8,marginBottom:8}}>
-              <button className="btn btn-g" style={{flex:2}} onClick={save}>{editing?"💾 Lưu":"➕ Thêm"}</button>
-              <button className="btn btn-gh" style={{flex:1}} onClick={()=>setModal(false)}>Huỷ</button>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-primary" style={{flex:2}} onClick={save}>{editId?"Lưu":"Thêm"}</button>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModal(false)}>Huỷ</button>
             </div>
           </div>
         </div>
@@ -1415,217 +1722,528 @@ function ServiceManager({services,setServices,toast}) {
   );
 }
 
-// ── SETTINGS PAGE ─────────────────────────────────────────────────────────────
-function Settings({logout,toast,services,setServices}) {
+
+// ── SETTINGS PAGE — all sections functional ───────────────────────────────────
+function SettingsPage({logout, toast, services, setServices, shop, setShop}) {
+  const [section, setSection] = useState(null); // null | "shop" | "bank" | "notif" | "pwa"
+
+  // ── Shop Info Form ──
+  const ShopForm = () => {
+    const [f,setF] = useState({name:shop.name,tagline:shop.tagline,phone:shop.phone||"",fb:shop.fb||"",footer:shop.footer||""});
+    return(
+      <div className="overlay" onClick={e=>e.target===e.currentTarget&&setSection(null)}>
+        <div className="sheet">
+          <DragHandle/>
+          <div className="sheet-title">🏪 Thông tin shop</div>
+          <div className="f"><label>Tên shop</label><input value={f.name} onChange={e=>setF(p=>({...p,name:e.target.value}))} placeholder="Mitchi The Mighty"/></div>
+          <div className="f"><label>Tagline / Mô tả ngắn</label><input value={f.tagline} onChange={e=>setF(p=>({...p,tagline:e.target.value}))} placeholder="Tarot and Lenormand Reader"/></div>
+          <div className="f"><label>Số điện thoại</label><input type="tel" value={f.phone} onChange={e=>setF(p=>({...p,phone:e.target.value}))} placeholder="0912345678"/></div>
+          <div className="f"><label>Facebook / Zalo / Instagram</label><input value={f.fb} onChange={e=>setF(p=>({...p,fb:e.target.value}))} placeholder="Link hoặc tên trang"/></div>
+          <div className="f"><label>Lời cảm ơn cuối hóa đơn</label><input value={f.footer} onChange={e=>setF(p=>({...p,footer:e.target.value}))} placeholder="Xin cảm ơn quý khách — Hẹn gặp lại!"/></div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-primary" style={{flex:2}} onClick={()=>{setShop(p=>({...p,...f}));setSection(null);toast("✅ Đã lưu thông tin shop!");}}>Lưu</button>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setSection(null)}>Huỷ</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Bank Form ──
+  const BankForm = () => {
+    const [f,setF] = useState({acbNo:shop.acbNo||"",acbName:shop.acbName||"",vcbNo:shop.vcbNo||"",vcbName:shop.vcbName||"",defaultQr:shop.defaultQr||"acb"});
+    return(
+      <div className="overlay" onClick={e=>e.target===e.currentTarget&&setSection(null)}>
+        <div className="sheet">
+          <DragHandle/>
+          <div className="sheet-title">💳 Tài khoản ngân hàng</div>
+          <div style={{fontFamily:"Nunito",fontWeight:700,fontSize:11,color:T.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>ACB</div>
+          <div className="f"><label>Số tài khoản ACB</label><input value={f.acbNo} onChange={e=>setF(p=>({...p,acbNo:e.target.value}))} placeholder="6205237"/></div>
+          <div className="f"><label>Tên chủ tài khoản ACB</label><input value={f.acbName} onChange={e=>setF(p=>({...p,acbName:e.target.value}))} placeholder="TON NU HONG CHAU"/></div>
+          <div style={{fontFamily:"Nunito",fontWeight:700,fontSize:11,color:T.muted,textTransform:"uppercase",letterSpacing:1,margin:"12px 0 8px"}}>Vietcombank</div>
+          <div className="f"><label>Số tài khoản VCB</label><input value={f.vcbNo} onChange={e=>setF(p=>({...p,vcbNo:e.target.value}))} placeholder="Để trống nếu không dùng"/></div>
+          <div className="f"><label>Tên chủ tài khoản VCB</label><input value={f.vcbName} onChange={e=>setF(p=>({...p,vcbName:e.target.value}))} placeholder="TON NU HONG CHAU"/></div>
+          <div className="f">
+            <label>Ngân hàng mặc định trên hóa đơn</label>
+            <div style={{display:"flex",gap:8}}>
+              {["acb","vcb"].map(b=>(
+                <button key={b} onClick={()=>setF(p=>({...p,defaultQr:b}))}
+                  style={{flex:1,padding:11,borderRadius:12,border:`1.5px solid ${f.defaultQr===b?T.ink:T.border2}`,background:f.defaultQr===b?T.ink:"transparent",fontFamily:"Nunito",fontWeight:700,fontSize:13,cursor:"pointer",color:f.defaultQr===b?"#fff":T.muted}}>
+                  🏦 {b==="acb"?"ACB":"VCB"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-primary" style={{flex:2}} onClick={()=>{setShop(p=>({...p,...f}));setSection(null);toast("✅ Đã lưu tài khoản ngân hàng!");}}>Lưu</button>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setSection(null)}>Huỷ</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Notifications ──
+  const NotifForm = () => {
+    const [f,setF]=useState({unpaid:shop.notifUnpaid??true,booking:shop.notifBooking??true,followup:shop.notifFollowup??true});
+    return(
+      <div className="overlay" onClick={e=>e.target===e.currentTarget&&setSection(null)}>
+        <div className="sheet">
+          <DragHandle/>
+          <div className="sheet-title">🔔 Thông báo</div>
+          <div className="card" style={{marginBottom:12}}>
+            {[
+              {k:"unpaid",l:"Nhắc đơn chưa thanh toán",s:"Hiện cảnh báo trên Dashboard"},
+              {k:"booking",l:"Nhắc booking sắp tới",s:"Hiện trong Today Operations"},
+              {k:"followup",l:"Nhắc khách lâu chưa quay lại",s:"Sau 21 ngày không có đơn"},
+            ].map((x,i)=>(
+              <div key={x.k} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderBottom:i<2?`1px dashed ${T.border}`:"none"}}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:700}}>{x.l}</div>
+                  <div style={{fontSize:11,color:T.muted,marginTop:2}}>{x.s}</div>
+                </div>
+                <button className={`tog ${f[x.k]?"on":"off"}`} onClick={()=>setF(p=>({...p,[x.k]:!p[x.k]}))}/>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button className="btn btn-primary" style={{flex:2}} onClick={()=>{setShop(p=>({...p,notifUnpaid:f.unpaid,notifBooking:f.booking,notifFollowup:f.followup}));setSection(null);toast("✅ Đã lưu cài đặt thông báo!");}}>Lưu</button>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setSection(null)}>Huỷ</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── PWA Install ──
+  const PwaInfo = () => (
+    <div className="overlay" onClick={e=>e.target===e.currentTarget&&setSection(null)}>
+      <div className="sheet">
+        <DragHandle/>
+        <div className="sheet-title">📱 Cài như app (PWA)</div>
+        <div className="card card-green" style={{marginBottom:14}}>
+          <div style={{fontWeight:700,marginBottom:6}}>✅ App đã sẵn sàng cài!</div>
+          <div style={{fontSize:13,color:T.muted,lineHeight:1.6}}>Link: <strong>mitchi-shop.vercel.app</strong></div>
+        </div>
+        <div style={{fontSize:14,fontWeight:700,marginBottom:12}}>Hướng dẫn theo thiết bị:</div>
+        {[
+          {ico:"🍎",title:"iPhone / iPad (Safari)",steps:["Mở Safari → vào link app","Nhấn nút chia sẻ ⬆️ ở dưới","Chọn 'Thêm vào màn hình chính'","Nhấn 'Thêm' — xong! 🎉"]},
+          {ico:"🤖",title:"Android (Chrome)",steps:["Mở Chrome → vào link app","Nhấn menu ⋮ góc trên phải","Chọn 'Thêm vào màn hình chính'","Nhấn 'Thêm' — xong! 🎉"]},
+        ].map(d=>(
+          <div key={d.ico} className="card" style={{marginBottom:10}}>
+            <div style={{fontWeight:800,marginBottom:8}}>{d.ico} {d.title}</div>
+            {d.steps.map((s,i)=>(
+              <div key={i} style={{display:"flex",gap:10,marginBottom:i<d.steps.length-1?6:0}}>
+                <div style={{width:20,height:20,borderRadius:"50%",background:T.ink,color:"#fff",fontSize:11,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{i+1}</div>
+                <div style={{fontSize:13,color:T.muted}}>{s}</div>
+              </div>
+            ))}
+          </div>
+        ))}
+        <button className="btn btn-ghost" onClick={()=>setSection(null)}>Đóng</button>
+      </div>
+    </div>
+  );
+
   return(
     <div className="scroll-body">
       <div className="hdr">
-        <div className="hdr-deco">⚙️</div>
         <div className="hdr-eye">Tùy chỉnh</div>
         <div className="hdr-h1">Cài Đặt</div>
       </div>
       <div className="sec">
+        {/* Shop preview */}
+        <div className="card card-green" style={{marginBottom:16,display:"flex",alignItems:"center",gap:14}}>
+          <img src="/images/logo.jpg" alt="Logo" style={{width:52,height:52,objectFit:"contain",borderRadius:10,flexShrink:0}} onError={e=>{e.target.style.display="none";}}/>
+          <div>
+            <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:16}}>{shop.name}</div>
+            <div style={{fontSize:12,color:T.muted}}>{shop.tagline}</div>
+          </div>
+        </div>
+
         <ServiceManager services={services} setServices={setServices} toast={toast}/>
-        <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:12,color:P.muted,textTransform:"uppercase",letterSpacing:1,margin:"20px 0 8px"}}>Shop & tài khoản</div>
+
+        <div style={{fontFamily:"Nunito",fontWeight:700,fontSize:11,color:T.muted,textTransform:"uppercase",letterSpacing:1,margin:"20px 0 10px"}}>Shop & Tài Khoản</div>
+
         {[
-          {ico:"🏪",t:"Thông tin shop",s:"Mitchi Tarot · Tên, logo"},
-          {ico:"💳",t:"Tài khoản ngân hàng",s:"ACB · Vietcombank"},
-          {ico:"🔔",t:"Thông báo",s:"Nhắc booking & chưa TT"},
-          {ico:"📱",t:"Cài như app (PWA)",s:"Thêm vào màn hình chính"},
-          {ico:"☁️",t:"Sao lưu & đồng bộ",s:"Kết nối Supabase · Real-time"},
+          {ico:"🏪",t:"Thông tin shop",     s:`${shop.name} · ${shop.tagline}`,                          fn:()=>setSection("shop")},
+          {ico:"💳",t:"Tài khoản ngân hàng",s:`ACB ${shop.acbNo||"—"} · ${shop.vcbNo?"VCB "+shop.vcbNo:""}`,fn:()=>setSection("bank")},
+          {ico:"🔔",t:"Thông báo",          s:"Nhắc booking, chưa TT, follow-up",                        fn:()=>setSection("notif")},
+          {ico:"📱",t:"Cài như app (PWA)",  s:"Thêm vào màn hình chính điện thoại",                      fn:()=>setSection("pwa")},
+          {ico:"☁️",t:"Sao lưu & đồng bộ", s:"Cần setup Supabase — xem hướng dẫn",                     fn:()=>toast("☁️ Xem hướng dẫn setup Supabase trong README!")},
         ].map(x=>(
-          <div key={x.t} className="row" onClick={()=>toast("✏️ Tính năng sắp ra mắt!")}>
-            <div style={{fontSize:22}}>{x.ico}</div>
-            <div style={{flex:1}}><div style={{fontSize:14,fontWeight:700}}>{x.t}</div><div style={{fontSize:11,fontWeight:600,color:P.muted,marginTop:2}}>{x.s}</div></div>
-            <div style={{fontWeight:800,fontSize:18,color:P.muted}}>›</div>
+          <div key={x.t} className="row" onClick={x.fn}>
+            <div style={{fontSize:22,width:36,textAlign:"center",flexShrink:0}}>{x.ico}</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:700}}>{x.t}</div>
+              <div style={{fontSize:11,color:T.muted,marginTop:2}}>{x.s}</div>
+            </div>
+            <div style={{color:T.border2}}>{I.arr}</div>
           </div>
         ))}
+
         <div style={{height:16}}/>
-        <button className="btn" style={{background:P.card,color:P.red,border:`2.5px solid ${P.red}`,boxShadow:`3px 3px 0 ${P.red}`,fontFamily:"Nunito",fontWeight:900}} onClick={logout}>Đăng xuất</button>
+        <button className="btn btn-ghost" style={{color:T.red,borderColor:T.red}} onClick={logout}>Đăng xuất</button>
       </div>
+
+      {section==="shop"  && <ShopForm/>}
+      {section==="bank"  && <BankForm/>}
+      {section==="notif" && <NotifForm/>}
+      {section==="pwa"   && <PwaInfo/>}
     </div>
   );
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
-function Dashboard({nav,orders,customers,services,bookings,toast}) {
-  const mx=Math.max(...WEEK.map(w=>w.v));
-  const COLS=[P.sky,P.green,P.yellow,P.orange,P.skydk,P.green,P.red];
-  const paidToday=orders.filter(o=>o.date===today()&&o.status==="paid");
-  const revToday=paidToday.reduce((s,o)=>s+o.total,0);
-  const tipsToday=paidToday.reduce((s,o)=>s+(o.tips||0),0);
-  const unpaid=orders.filter(o=>["new","view","done"].includes(o.status));
-  const todayBks=bookings.filter(b=>b.date===today());
-  const topSvcs=[...services].filter(s=>s.active).sort((a,b)=>b.sold-a.sold).slice(0,3);
+function Dashboard({nav, orders, setOrders, customers, services, bookings, setBookings, toast, shop}) {
+  const [fabOpen, setFabOpen] = useState(false);
+
+  const todayOrds  = orders.filter(o=>o.date===todayStr());
+  const unpaidOrds = orders.filter(o=>["new","view","done"].includes(o.status));
+  const revToday   = todayOrds.filter(o=>o.status==="paid").reduce((s,o)=>s+o.total,0);
+  const tipsToday  = todayOrds.reduce((s,o)=>s+(o.tips||0),0);
+  const todayBks   = bookings.filter(b=>b.date===todayStr());
+  const pendingBks = todayBks.filter(b=>b.status==="pending").length;
+
+  const custOrders = id => orders.filter(o=>o.custId===id);
+  const daysSince  = dateStr => { if(!dateStr||dateStr==="-") return 999; const [d,m,y]=dateStr.split("/").map(Number); return Math.floor((new Date()-new Date(y,m-1,d))/(86400000)); };
+  const needFollowUp = customers.filter(c=>daysSince(c.lastOrder||"")>21&&custOrders(c.id).length>0);
+  const topSvc = [...services].filter(s=>s.active).sort((a,b)=>b.sold-a.sold)[0];
+  const WEEK_DATA=[320000,510000,280000,620000,450000,780000,590000];
+  const maxW=Math.max(...WEEK_DATA);
+  const COLS=[T.green,T.blue,T.yellow,T.green,T.greenlt,T.purple,T.red];
+
+  const advanceOrder = id => {
+    setOrders(p=>p.map(o=>{
+      if(o.id!==id) return o;
+      const idx=STATUS_FLOW.indexOf(o.status);
+      if(idx>=STATUS_FLOW.length-2) return o;
+      return {...o,status:STATUS_FLOW[idx+1]};
+    }));
+    toast("✅ Đã cập nhật trạng thái!");
+  };
+
+  const confirmBk = id => { setBookings(p=>p.map(b=>b.id===id?{...b,status:"confirmed"}:b)); toast("✅ Đã xác nhận booking!"); };
+
   return(
     <div className="scroll-body">
+      {/* Header */}
       <div className="hdr">
-        <div className="hdr-deco">🔮</div>
-        <div className="hdr-eye">🐸 Xin chào Mitchi!</div>
-        <div className="hdr-h1">Hôm nay</div>
-        <div className="hdr-sub">{new Date().toLocaleDateString("vi-VN",{weekday:"long",day:"numeric",month:"long"})}</div>
-      </div>
-
-      {/* Revenue banner */}
-      <div style={{margin:"14px 16px 0",background:P.green,borderRadius:20,border:`2.5px solid ${P.ink}`,boxShadow:`4px 4px 0 ${P.ink}`,padding:"18px 20px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div>
-            <div style={{fontSize:11,fontWeight:800,textTransform:"uppercase",letterSpacing:1.5,color:"rgba(255,255,255,.7)",marginBottom:3}}>Doanh thu hôm nay</div>
-            <div style={{fontFamily:"Nunito",fontSize:34,fontWeight:900,color:"#fff",lineHeight:1}}>{vnd(revToday)}</div>
-            {tipsToday>0&&<div style={{fontSize:12,fontWeight:800,color:"rgba(255,255,255,.8)",marginTop:4}}>+ {vnd(tipsToday)} tips 💜</div>}
+        <div className="hdr-eye">Hôm nay · {new Date().toLocaleDateString("vi-VN",{weekday:"long",day:"numeric",month:"long"})}</div>
+        <div className="hdr-h1">Mitchi Shop ✨</div>
+        {unpaidOrds.length>0&&(
+          <div className="hdr-badge">
+            <span style={{color:T.yellow}}>●</span> {unpaidOrds.length} đơn chưa thu tiền
           </div>
-          <div style={{fontSize:48,opacity:.2}}>💰</div>
-        </div>
+        )}
       </div>
 
-      <div className="sg">
-        {[
-          {i:"📋",n:orders.filter(o=>o.date===today()).length,l:"Đơn hôm nay",bg:P.sky},
-          {i:"⏳",n:unpaid.length,l:"Chưa thu tiền",bg:unpaid.length>0?"#FFE4E4":P.yellowbg,alert:unpaid.length>0},
-          {i:"👤",n:customers.filter(c=>c.created===today()).length,l:"Khách mới",bg:P.greenbg},
-          {i:"📅",n:todayBks.length,l:"Booking hôm nay",bg:P.cloud},
-        ].map(s=>(
-          <div key={s.l} className="sc" style={{background:s.bg,position:"relative"}}>
-            {s.alert&&<div style={{position:"absolute",top:10,right:10,width:8,height:8,borderRadius:"50%",background:P.red,border:`1.5px solid ${P.ink}`}}/>}
-            <div className="sc-i">{s.i}</div>
-            <div className="sc-n">{s.n}</div>
-            <div className="sc-l">{s.l}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Quick actions */}
+      {/* SECTION 1 — Priority metrics */}
       <div className="sec">
-        <div className="sec-h"><div className="sec-t">⚡ Thao tác nhanh</div></div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <div className="metric-big" style={{marginBottom:10}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div>
+              <div className="metric-label">Doanh thu hôm nay</div>
+              <div className="metric-value">{vnd(revToday)}</div>
+              {tipsToday>0&&<div className="metric-sub">+{vnd(tipsToday)} tips 💜</div>}
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:10,color:"rgba(255,255,255,.4)",textTransform:"uppercase",marginBottom:3}}>Đơn</div>
+              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:22,color:T.yellow}}>{todayOrds.length}</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
           {[
-            {ico:"👤",l:"Thêm Khách",  s:"Tạo khách mới",  bg:P.sky,    fn:()=>nav("customers")},
-            {ico:"📋",l:"Tạo Đơn",     s:"Sau khi xem bài", bg:P.yellow, fn:()=>nav("orders")},
-            {ico:"📅",l:"Tạo Booking", s:"Đặt lịch trước",  bg:P.greenbg,fn:()=>nav("booking")},
-            {ico:"📋",l:"Tin Mẫu",     s:"Copy 1 chạm",      bg:P.cloud,  fn:()=>nav("messages")},
-          ].map(q=>(
-            <div key={q.l} style={{background:q.bg,borderRadius:16,border:`2.5px solid ${P.ink}`,boxShadow:`3px 3px 0 ${P.ink}`,padding:16,cursor:"pointer",textAlign:"center",transition:"all .1s"}}
-              onClick={q.fn} onMouseDown={e=>e.currentTarget.style.transform="translate(2px,2px)"} onMouseUp={e=>e.currentTarget.style.transform=""}>
-              <div style={{fontSize:28,marginBottom:7}}>{q.ico}</div>
-              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:13,color:P.ink}}>{q.l}</div>
-              <div style={{fontSize:10,fontWeight:700,color:P.muted,marginTop:2}}>{q.s}</div>
+            {l:"Booking hôm nay",v:todayBks.length,ico:"📅",bg:T.bluebg,c:T.blue},
+            {l:"Slot chờ xác nhận",v:pendingBks,ico:"⏳",bg:T.yellowbg,c:"#92660A"},
+            {l:"Chưa thu tiền",v:unpaidOrds.length,ico:"💸",bg:T.redbg,c:T.red},
+          ].map(s=>(
+            <div key={s.l} className="metric-sm" style={{background:s.bg,padding:12}}>
+              <div style={{fontSize:18,marginBottom:4}}>{s.ico}</div>
+              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:22,color:s.c}}>{s.v}</div>
+              <div style={{fontSize:10,fontWeight:700,color:s.c,opacity:.8,textTransform:"uppercase",letterSpacing:.5,marginTop:2,lineHeight:1.2}}>{s.l}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Unpaid alert */}
-      {unpaid.length>0&&(
+      {/* SECTION 2 — Action Required */}
+      {unpaidOrds.length>0&&(
         <div className="sec">
-          <div className="box" style={{background:"#FFE4E4",borderColor:P.red,display:"flex",alignItems:"center",gap:14}}>
-            <div style={{fontSize:26}}>⚠️</div>
-            <div style={{flex:1}}>
-              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14}}>{unpaid.length} đơn chưa thu tiền</div>
-              <div style={{fontSize:11,fontWeight:700,color:P.muted,marginTop:2}}>Nhắc khách để không bị quên</div>
-            </div>
-            <button className="btn-xs btn btn-y" onClick={()=>{navigator.clipboard?.writeText(REPLIES[3].body);toast("📋 Đã copy tin nhắn nhắc TT!");}}>Copy</button>
-          </div>
+          <div className="sec-h"><div className="sec-t">⚡ Cần xử lý</div></div>
+          {unpaidOrds.slice(0,3).map(o=>{
+            const c=customers.find(x=>x.id===o.custId);
+            const nl=STATUS_MAP[STATUS_FLOW[STATUS_FLOW.indexOf(o.status)+1]];
+            return(
+              <div key={o.id} className="action-card" style={{borderLeft:`3px solid ${o.status==="done"?T.yellow:o.status==="view"?T.purple:T.blue}`}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                  <div style={{fontSize:22}}>{c?.ava||"👤"}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:14,fontWeight:700}}>{c?.name} · <Badge s={o.status}/></div>
+                    <div style={{fontSize:11,color:T.muted}}>{o.items.map(it=>{const s=services.find(x=>x.id===it.svcId);return s?s.name:"";}).filter(Boolean).join(" + ")} · {vnd(o.total)}</div>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {nl&&<button className="xs xs-green" onClick={()=>advanceOrder(o.id)}>→ {nl[0]}</button>}
+                  <button className="xs" onClick={()=>{navigator.clipboard?.writeText(REPLIES[3].body);toast("📋 Copy nhắc TT!");}}>💸 Nhắc TT</button>
+                  <button className="xs" onClick={()=>nav("orders")}>Xem đơn</button>
+                </div>
+              </div>
+            );
+          })}
+          {unpaidOrds.length>3&&(
+            <button className="xs" style={{width:"100%",textAlign:"center",padding:10}} onClick={()=>nav("orders")}>
+              Xem tất cả {unpaidOrds.length} đơn →
+            </button>
+          )}
         </div>
       )}
 
-      {/* Today bookings */}
-      {todayBks.length>0&&(
+      {/* Booking hôm nay cần xác nhận */}
+      {pendingBks>0&&(
         <div className="sec">
-          <div className="sec-h"><div className="sec-t">🗓 Lịch hôm nay</div><span className="sec-a" onClick={()=>nav("booking")}>Xem tất cả</span></div>
-          {todayBks.map(b=>{
+          <div className="sec-h"><div className="sec-t">📅 Booking chờ xác nhận</div></div>
+          {todayBks.filter(b=>b.status==="pending").map(b=>{
             const c=customers.find(x=>x.id===b.custId);
             return(
-              <div key={b.id} className="row" style={{borderLeft:`4px solid ${b.status==="confirmed"?P.green:P.yellow}`}}>
-                <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:18,minWidth:48,textAlign:"center"}}>{b.time}</div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:14,fontWeight:700}}>{c?.name||"?"}</div>
-                  <div style={{fontSize:11,fontWeight:600,color:P.muted}}>{b.svc}{b.notes&&` · ${b.notes}`}</div>
+              <div key={b.id} className="action-card action-card-yellow">
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                  <div style={{fontSize:22}}>{c?.ava||"👤"}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:14,fontWeight:700}}>{b.time} · {c?.name}</div>
+                    <div style={{fontSize:11,color:T.muted}}>{services.find(s=>s.id===b.svcId)?.name||"Dịch vụ"}</div>
+                  </div>
                 </div>
-                <span className={`bd ${b.status==="confirmed"?"bd-paid":"bd-pend"}`}>{b.status==="confirmed"?"XÁC NHẬN":"CHỜ"}</span>
+                <div style={{display:"flex",gap:6}}>
+                  <button className="xs xs-green" onClick={()=>confirmBk(b.id)}>✅ Xác nhận</button>
+                  <button className="xs" onClick={()=>nav("booking")}>Xem lịch</button>
+                </div>
               </div>
             );
           })}
         </div>
       )}
 
-      {/* Top services */}
-      <div className="sec">
-        <div className="sec-h"><div className="sec-t">🏆 Dịch vụ bán chạy</div><span className="sec-a" onClick={()=>nav("report")}>Chi tiết</span></div>
-        <div className="box">
-          {topSvcs.map((s,i)=>(
-            <div key={s.id} className="rb-row" style={{marginBottom:i<topSvcs.length-1?12:0}}>
-              <div className="rb-lbl">{s.ico} {s.name.replace("Tarot ","").replace("Lenormand ","")}</div>
-              <div className="rb-track"><div className="rb-fill" style={{width:`${Math.round(s.sold/topSvcs[0].sold*100)}%`,background:COLS[i]}}/></div>
-              <div className="rb-val">{s.sold} đơn</div>
+      {/* Follow-up alert */}
+      {needFollowUp.length>0&&(
+        <div className="sec">
+          <div className="action-card action-card-purple">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <div style={{fontWeight:700,color:T.purple}}>📌 {needFollowUp.length} khách lâu chưa quay lại</div>
+              <button className="xs xs-purple" onClick={()=>nav("customers")}>Xem</button>
             </div>
-          ))}
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {needFollowUp.slice(0,3).map(c=>(
+                <button key={c.id} className="xs" style={{background:T.purplebg,borderColor:T.purple,color:T.purple}}
+                  onClick={()=>{navigator.clipboard?.writeText(REPLIES[6].body.replace("bạn",c.nick||c.name));toast(`📋 Copy tin follow-up cho ${c.nick||c.name}!`);}}>
+                  {c.ava} {c.nick||c.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Today bookings confirmed */}
+      {todayBks.filter(b=>b.status==="confirmed").length>0&&(
+        <div className="sec">
+          <div className="sec-h">
+            <div className="sec-t">🗓 Lịch hôm nay</div>
+            <span className="sec-a" onClick={()=>nav("booking")}>Xem tất cả</span>
+          </div>
+          {todayBks.filter(b=>b.status==="confirmed").map(b=>{
+            const c=customers.find(x=>x.id===b.custId);
+            return(
+              <div key={b.id} className="row" style={{borderLeft:`3px solid ${T.green}`}}>
+                <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:18,minWidth:50,color:T.ink}}>{b.time}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:700}}>{c?.name}</div>
+                  <div style={{fontSize:11,color:T.muted}}>{services.find(s=>s.id===b.svcId)?.name||"Dịch vụ"}{b.notes?` · ${b.notes}`:""}</div>
+                </div>
+                <span className="bd bd-confirm">XÁC NHẬN</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Business insights */}
+      <div className="sec">
+        <div className="sec-h"><div className="sec-t">📊 Doanh thu tuần</div><span className="sec-a" onClick={()=>nav("report")}>Chi tiết</span></div>
+        <div className="card">
+          <div className="bc">
+            {WEEK_DAYS.map((d,i)=>(
+              <div key={d} className="bcol">
+                <div className="bbar" style={{height:`${(WEEK_DATA[i]/maxW)*70}px`,background:COLS[i]}}/>
+                <div className="blbl">{d}</div>
+              </div>
+            ))}
+          </div>
+          {topSvc&&(
+            <div style={{marginTop:12,paddingTop:10,borderTop:`1px dashed ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontSize:12,color:T.muted,fontWeight:600}}>Hot nhất tuần</div>
+              <div style={{fontSize:13,fontWeight:700,color:T.green}}>{topSvc.ico} {topSvc.name}</div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Week chart */}
-      <div className="sec">
-        <div className="sec-h"><div className="sec-t">📊 Doanh thu tuần</div></div>
-        <div className="box">
-          <div className="bc">
-            {WEEK.map((w,i)=><div key={w.d} className="bcol"><div className="bbar" style={{height:`${(w.v/mx)*74}px`,background:COLS[i]}}/><div className="blbl">{w.d}</div></div>)}
+      {/* FAB with quick actions */}
+      {fabOpen&&(
+        <>
+          <div style={{position:"fixed",inset:0,zIndex:97}} onClick={()=>setFabOpen(false)}/>
+          <div className="fab-menu">
+            {[
+              {ico:"👤",l:"Thêm khách mới",fn:()=>{setFabOpen(false);nav("customers");}},
+              {ico:"📋",l:"Tạo đơn mới",   fn:()=>{setFabOpen(false);nav("orders");}},
+              {ico:"📅",l:"Tạo booking",    fn:()=>{setFabOpen(false);nav("booking");}},
+              {ico:"📋",l:"Copy tin mẫu",   fn:()=>{setFabOpen(false);nav("messages");}},
+            ].map(q=>(
+              <div key={q.l} className="fab-item" onClick={q.fn}>
+                <div className="fab-item-btn">{q.ico} {q.l}</div>
+                <div className="fab-dot">{q.ico}</div>
+              </div>
+            ))}
           </div>
+        </>
+      )}
+      <button className="fab" onClick={()=>setFabOpen(v=>!v)} style={{background:fabOpen?T.red:T.green}}>
+        {fabOpen?I.x:I.plus}
+      </button>
+    </div>
+  );
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
+function Login({onLogin}) {
+  const [f,setF]=useState({e:"",p:""});
+  const [err,setErr]=useState("");
+  const go=()=>{
+    if(f.e==="mitchi@shop.vn"&&f.p==="mitchi2024") onLogin();
+    else setErr("Sai email hoặc mật khẩu!");
+  };
+  return(
+    <div className="login-bg">
+      <div style={{textAlign:"center",marginBottom:32}}>
+        <div style={{fontSize:64,marginBottom:8}}>🌙</div>
+        <div style={{fontFamily:"Nunito",fontSize:40,fontWeight:900,color:"#fff",letterSpacing:-1}}>Mitchi</div>
+        <div style={{fontSize:13,fontWeight:600,color:"rgba(255,255,255,.4)",marginTop:4,letterSpacing:.5}}>Shop Manager · Tarot & Lenormand</div>
+      </div>
+      <div style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:20,padding:24,width:"100%",maxWidth:360,backdropFilter:"blur(10px)"}}>
+        <div className="f"><label style={{color:"rgba(255,255,255,.4)"}}>Email</label>
+          <input type="email" placeholder="mitchi@shop.vn" value={f.e} onChange={e=>setF(p=>({...p,e:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&go()} style={{background:"rgba(255,255,255,.08)",borderColor:"rgba(255,255,255,.15)",color:"#fff"}}/>
         </div>
+        <div className="f"><label style={{color:"rgba(255,255,255,.4)"}}>Mật khẩu</label>
+          <input type="password" placeholder="••••••••" value={f.p} onChange={e=>setF(p=>({...p,p:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&go()} style={{background:"rgba(255,255,255,.08)",borderColor:"rgba(255,255,255,.15)",color:"#fff"}}/>
+        </div>
+        {err&&<div style={{color:"#FF6B6B",fontSize:13,fontWeight:600,marginBottom:10}}>⚠️ {err}</div>}
+        <button className="btn btn-yellow" onClick={go}>Đăng nhập</button>
+        <div style={{fontSize:11,color:"rgba(255,255,255,.25)",textAlign:"center",marginTop:12}}>Demo: mitchi@shop.vn / mitchi2024</div>
       </div>
     </div>
   );
 }
 
+
 // ── ROOT APP ──────────────────────────────────────────────────────────────────
-const NAV=[
-  {id:"dashboard",l:"Home",   ico:()=>I.home},
-  {id:"orders",   l:"Đơn",   ico:()=>I.order},
+const NAV_ITEMS = [
+  {id:"dashboard",l:"Home",    ico:()=>I.home},
+  {id:"orders",   l:"Đơn",    ico:()=>I.order},
   {id:"customers",l:"Khách",  ico:()=>I.users},
-  {id:"booking",  l:"Lịch",  ico:()=>I.cal},
-  {id:"messages", l:"Mẫu",   ico:()=>I.msg},
+  {id:"booking",  l:"Lịch",   ico:()=>I.cal},
+  {id:"messages", l:"Mẫu",    ico:()=>I.msg},
   {id:"report",   l:"Báo cáo",ico:()=>I.chart},
   {id:"settings", l:"Cài đặt",ico:()=>I.cog},
 ];
 
+const DEFAULT_SHOP = {
+  name:     "Mitchi The Mighty",
+  tagline:  "Tarot and Lenormand Reader",
+  phone:    "",
+  fb:       "",
+  acbNo:    "6205237",
+  acbName:  "TON NU HONG CHAU",
+  vcbNo:    "",
+  vcbName:  "TON NU HONG CHAU",
+  defaultQr:"acb",
+  footer:   "Xin cảm ơn quý khách — Hẹn gặp lại!",
+  notifUnpaid:   true,
+  notifBooking:  true,
+  notifFollowup: true,
+};
+
 export default function App() {
-  const [auth,setAuth]=useState(false);
-  const [page,setPage]=useState("dashboard");
-  const [toastMsg,setToast]=useState("");
-  const [services,setServices]=useState(SEED_SVCS);
-  const [customers,setCustomers]=useState(SEED_CUSTS);
-  const [orders,setOrders]=useState(SEED_ORDERS);
-  const [bookings,setBookings]=useState(SEED_BOOKINGS);
-  const [newOrderCustId,setNewOrderCustId]=useState(null);
+  const [auth,      setAuth]      = useState(false);
+  const [page,      setPage]      = useState("dashboard");
+  const [toastMsg,  setToast]     = useState("");
+  const [services,  setServices]  = useState(SEED_SVCS);
+  const [customers, setCustomers] = useState(SEED_CUSTS);
+  const [orders,    setOrders]    = useState(SEED_ORDERS);
+  const [bookings,  setBookings]  = useState(SEED_BOOKINGS);
+  const [defCustId, setDefCustId] = useState(null);
+  const [shop,      setShop]      = useState(DEFAULT_SHOP);
+  const [replies,   setReplies]   = useState(REPLIES);
 
-  const toast=msg=>{setToast(msg);setTimeout(()=>setToast(""),2400);};
-  const nav=id=>setPage(id);
+  const toast = msg => { setToast(msg); setTimeout(()=>setToast(""), 2500); };
+  const nav   = id  => setPage(id);
 
-  const navToOrders=(custId)=>{
-    setNewOrderCustId(custId);
-    setPage("orders");
-    setTimeout(()=>setNewOrderCustId(null),100);
+  // Centralized save — updates order AND customer.lastOrder
+  const saveOrder = o => {
+    setOrders(p => {
+      const exists = p.find(x=>x.id===o.id);
+      return exists ? p.map(x=>x.id===o.id?o:x) : [o,...p];
+    });
+    setCustomers(p=>p.map(c=>c.id===o.custId?{...c,lastOrder:o.date}:c));
   };
 
-  const pages={
-    dashboard:<Dashboard nav={nav} orders={orders} customers={customers} services={services} bookings={bookings} toast={toast}/>,
-    orders:<Orders orders={orders} setOrders={setOrders} customers={customers} services={services} toast={toast}/>,
-    customers:<Customers customers={customers} setCustomers={setCustomers} orders={orders} services={services} toast={toast} navToOrders={navToOrders}/>,
-    booking:<Booking bookings={bookings} setBookings={setBookings} customers={customers} services={services} toast={toast}/>,
-    messages:<Messages toast={toast}/>,
-    report:<Report orders={orders} customers={customers} services={services}/>,
-    settings:<Settings logout={()=>setAuth(false)} toast={toast} services={services} setServices={setServices}/>,
+  const createOrderFor = custId => { setDefCustId(custId); setPage("orders"); };
+  const clearDef = () => setDefCustId(null);
+
+  const pages = {
+    dashboard: <Dashboard
+      nav={nav} orders={orders} setOrders={setOrders}
+      customers={customers} services={services}
+      bookings={bookings} setBookings={setBookings}
+      toast={toast} shop={shop}
+    />,
+    orders: <OrdersPage
+      orders={orders} setOrders={setOrders} saveOrder={saveOrder}
+      customers={customers} services={services} toast={toast}
+      defaultCustId={defCustId} clearDefaultCust={clearDef} shop={shop}
+    />,
+    customers: <CustomersPage
+      customers={customers} setCustomers={setCustomers}
+      orders={orders} services={services}
+      toast={toast} onCreateOrder={createOrderFor}
+    />,
+    booking: <BookingPage
+      bookings={bookings} setBookings={setBookings}
+      customers={customers} services={services}
+      orders={orders} setOrders={setOrders} saveOrder={saveOrder}
+      toast={toast}
+    />,
+    messages: <MessagesPage toast={toast} replies={replies} setReplies={setReplies}/>,
+    report:   <ReportPage orders={orders} customers={customers} services={services}/>,
+    settings: <SettingsPage
+      logout={()=>setAuth(false)} toast={toast}
+      services={services} setServices={setServices}
+      shop={shop} setShop={setShop}
+    />,
   };
 
   return(
     <>
       <style>{CSS}</style>
-      {!auth?(
+      {!auth ? (
         <Login onLogin={()=>setAuth(true)}/>
-      ):(
+      ) : (
         <div className="app">
           {toastMsg&&<div className="toast">{toastMsg}</div>}
           {pages[page]||pages.dashboard}
           <nav className="bnav">
-            {NAV.map(n=>(
+            {NAV_ITEMS.map(n=>(
               <button key={n.id} className={`nb ${page===n.id?"on":""}`} onClick={()=>setPage(n.id)}>
                 {n.ico()}<span>{n.l}</span>
               </button>
