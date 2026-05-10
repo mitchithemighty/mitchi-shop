@@ -47,19 +47,20 @@ function getSbHeaders(extra) {
 
 async function sbFetch(path, opts) {
   const method = (opts && opts.method) || "GET";
-  const prefer = (opts && opts.prefer) !== undefined ? opts.prefer : "return=representation";
+  const prefer = (opts && opts.prefer !== undefined) ? opts.prefer : "return=representation";
+  const SBK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuamJmZGdqdmRjb2dtZHh1ZXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjQ3NzEsImV4cCI6MjA5Mzk0MDc3MX0.PmrsxdtLRzlGXzMEPyJLea0nt2xCBNoNv5_OSS3vkCg";
   const headers = {
-    "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuamJmZGdqdmRjb2dtZHh1ZXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjQ3NzEsImV4cCI6MjA5Mzk0MDc3MX0.PmrsxdtLRzlGXzMEPyJLea0nt2xCBNoNv5_OSS3vkCg",
-    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuamJmZGdqdmRjb2dtZHh1ZXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjQ3NzEsImV4cCI6MjA5Mzk0MDc3MX0.PmrsxdtLRzlGXzMEPyJLea0nt2xCBNoNv5_OSS3vkCg",
+    "apikey": SBK,
+    "Authorization": "Bearer " + SBK,
     "Content-Type": "application/json",
-    "Prefer": prefer,
   };
+  if (prefer) headers["Prefer"] = prefer;
   const res = await fetch(
     "https://snjbfdgjvdcogmdxuetl.supabase.co/rest/v1" + path,
     {
       method: method,
       headers: headers,
-      body: opts && opts.body ? opts.body : undefined,
+      body: (opts && opts.body) ? opts.body : undefined,
     }
   );
   if (!res.ok) {
@@ -85,7 +86,6 @@ const sb = {
     sbFetch(`/${table}`, {
       method:"POST", body:JSON.stringify(row),
       prefer:"resolution=merge-duplicates,return=representation",
-      headers: { "Prefer":"resolution=merge-duplicates,return=representation" }
     }),
 
   // UPDATE by id
@@ -805,11 +805,14 @@ function OrderDetail({order, customers, services, onUpdate, onDelete, onClose, t
           <div className="card card-red" style={{marginTop:12}}>
             <div style={{fontWeight:800,marginBottom:4,color:T.red}}>⚠️ Xử lý đơn này?</div>
             <div style={{fontSize:12,color:T.muted,marginBottom:12}}>Huỷ = đổi trạng thái Huỷ · Xoá = xoá vĩnh viễn</div>
-            <div style={{display:"flex",gap:8}}>
-              <button className="btn btn-red" style={{flex:1,fontSize:12}} onClick={()=>{onUpdate({...order,status:"cancel"});setConfirm(false);toast("🗑 Đã huỷ đơn!");}}>🚫 Huỷ đơn</button>
-              <button className="btn btn-red" style={{flex:1,fontSize:12,background:"#7B0000"}} onClick={()=>{onDelete(order.id);onClose();toast("🗑 Đã xoá đơn vĩnh viễn!");}}>🗑 Xoá hẳn</button>
-              <button className="btn btn-ghost" style={{flex:1,fontSize:12}} onClick={()=>setConfirm(false)}>Không</button>
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              <button className="btn btn-red" style={{flex:1,fontSize:13}} onClick={()=>{onUpdate({...order,status:"cancel"});setConfirm(false);toast("🚫 Đã huỷ đơn!");}}>🚫 Huỷ đơn</button>
+              <button className="btn btn-ghost" style={{flex:1,fontSize:13}} onClick={()=>setConfirm(false)}>Không</button>
             </div>
+            <button className="btn" style={{width:"100%",background:"#7B0000",color:"#fff",border:"none",borderRadius:12,padding:11,fontFamily:"Nunito",fontWeight:900,fontSize:13,cursor:"pointer"}}
+              onClick={()=>{onDelete(order.id);setConfirm(false);onClose();toast("🗑 Đã xoá đơn vĩnh viễn!");}}>
+              🗑 Xoá vĩnh viễn khỏi hệ thống
+            </button>
           </div>
         )}
       </div>
