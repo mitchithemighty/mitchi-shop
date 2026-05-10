@@ -2513,7 +2513,7 @@ export default function App() {
         sb.getAll("orders", "created_at.desc"),
         sb.getAll("bookings", "date.asc,time.asc"),
         sb.getAll("replies", "created_at.asc"),
-        sb.getAll("shop_settings"),
+        sbFetch("/shop_settings?id=eq.singleton"),
       ]);
       // Parse JSON fields from Supabase string columns
       if (svcs.length)  setServices(svcs);
