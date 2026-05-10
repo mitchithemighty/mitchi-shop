@@ -34,23 +34,37 @@ const T = {
 };
 
 // ── SUPABASE CLIENT ───────────────────────────────────────────────────────────
-const SB_URL = "https://snjbfdgjvdcogmdxuetl.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuamJmZGdqdmRjb2dtZHh1ZXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjQ3NzEsImV4cCI6MjA5Mzk0MDc3MX0.PmrsxdtLRzlGXzMEPyJLea0nt2xCBNoNv5_OSS3vkCg";
+// Supabase config - inlined để tránh Next.js chunk splitting
+function getSbHeaders(extra) {
+  return {
+    "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuamJmZGdqdmRjb2dtZHh1ZXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjQ3NzEsImV4cCI6MjA5Mzk0MDc3MX0.PmrsxdtLRzlGXzMEPyJLea0nt2xCBNoNv5_OSS3vkCg",
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuamJmZGdqdmRjb2dtZHh1ZXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjQ3NzEsImV4cCI6MjA5Mzk0MDc3MX0.PmrsxdtLRzlGXzMEPyJLea0nt2xCBNoNv5_OSS3vkCg",
+    "Content-Type": "application/json",
+    "Prefer": "return=representation",
+    ...extra,
+  };
+}
 
-async function sbFetch(path, opts={}) {
-  const res = await fetch(SB_URL + "/rest/v1" + path, {
-    headers: {
-      "apikey": SB_KEY,
-      "Authorization": "Bearer " + SB_KEY,
-      "Content-Type": "application/json",
-      "Prefer": opts.prefer || "return=representation",
-      ...opts.headers,
-    },
-    ...opts,
-  });
+async function sbFetch(path, opts) {
+  const method = (opts && opts.method) || "GET";
+  const prefer = (opts && opts.prefer) !== undefined ? opts.prefer : "return=representation";
+  const headers = {
+    "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuamJmZGdqdmRjb2dtZHh1ZXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjQ3NzEsImV4cCI6MjA5Mzk0MDc3MX0.PmrsxdtLRzlGXzMEPyJLea0nt2xCBNoNv5_OSS3vkCg",
+    "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuamJmZGdqdmRjb2dtZHh1ZXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjQ3NzEsImV4cCI6MjA5Mzk0MDc3MX0.PmrsxdtLRzlGXzMEPyJLea0nt2xCBNoNv5_OSS3vkCg",
+    "Content-Type": "application/json",
+    "Prefer": prefer,
+  };
+  const res = await fetch(
+    "https://snjbfdgjvdcogmdxuetl.supabase.co/rest/v1" + path,
+    {
+      method: method,
+      headers: headers,
+      body: opts && opts.body ? opts.body : undefined,
+    }
+  );
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Supabase ${res.status}: ${err}`);
+    throw new Error("Supabase " + res.status + ": " + err);
   }
   const text = await res.text();
   return text ? JSON.parse(text) : [];
@@ -89,17 +103,16 @@ const sb = {
 
 
 // ── SUPABASE AUTH ─────────────────────────────────────────────────────────────
-const SB_AUTH_URL = "https://snjbfdgjvdcogmdxuetl.supabase.co/auth/v1";
 
 async function sbAuth(action, email, password) {
   // action: "token?grant_type=password" for login, "signup" for register
-  const res = await fetch(`${SB_AUTH_URL}/${action}`, {
+  const res = await fetch("https://snjbfdgjvdcogmdxuetl.supabase.co/auth/v1/" + action, {
     method: "POST",
     headers: {
-      "apikey": SB_KEY,
+      "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuamJmZGdqdmRjb2dtZHh1ZXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjQ3NzEsImV4cCI6MjA5Mzk0MDc3MX0.PmrsxdtLRzlGXzMEPyJLea0nt2xCBNoNv5_OSS3vkCg",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email: email, password: password }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.msg || data.error_description || "Lỗi xác thực");
