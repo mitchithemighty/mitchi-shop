@@ -2520,7 +2520,8 @@ export default function App() {
       if (custs.length) setCustomers(custs);
       if (ords.length)  setOrders(ords.map(o => ({
         ...o,
-        items:  typeof o.items  === "string" ? JSON.parse(o.items  || "[]") : (o.items  || []),
+        custId: o.custId || o["custId"] || "",
+        items:  (() => { try { return typeof o.items==="string" ? JSON.parse(o.items||"[]") : (o.items||[]); } catch { return []; } })(),
         extraQ: Number(o.extraQ || 0),
         total:  Number(o.total  || 0),
         tips:   Number(o.tips   || 0),
@@ -2528,9 +2529,10 @@ export default function App() {
       if (bks.length)   setBookings(bks);
       if (reps.length)  setReplies(reps.map(r => ({
         ...r,
-        images: typeof r.images === "string" && r.images
-          ? (() => { try { return JSON.parse(r.images); } catch { return []; } })()
-          : (r.images || []),
+        images: (() => {
+          try { return r.images ? JSON.parse(r.images) : []; }
+          catch { return []; }
+        })(),
       })));
       if (settings.length) {
         const s = settings[0];
@@ -2546,7 +2548,7 @@ export default function App() {
     setSyncing(false);
   };
 
-  useEffect(() => { if (auth) loadFromDb(); }, [auth]);
+  useEffect(() => { if (auth && !dbReady) loadFromDb(); }, [auth, dbReady]);
 
   // ── Auto-sync helpers ─────────────────────────────────────────────────
   const syncSettings = async (newShop, newTopics) => {
@@ -2561,10 +2563,11 @@ export default function App() {
   };
 
   // Wrapped setters that also sync to Supabase
-  const setShopAndSync = async (updater) => {
+  const setShopAndSync = (updater) => {
     setShop(prev => {
       const next = typeof updater==="function" ? updater(prev) : updater;
-      syncSettings(next, topics).catch(console.error);
+      // Lấy topics hiện tại qua setTopics để tránh stale closure
+      setTopics(t => { syncSettings(next, t).catch(console.error); return t; });
       return next;
     });
   };
@@ -2596,7 +2599,12 @@ export default function App() {
       const next = typeof updater==="function" ? updater(prev) : updater;
       const prevIds = prev.map(c=>c.id);
       const nextIds = next.map(c=>c.id);
-      next.forEach(c => sb.upsert("customers", c).catch(console.error));
+      next.forEach(c => sb.upsert("customers", {
+        id: c.id, name: c.name||"", nick: c.nick||"",
+        phone: c.phone||"", social: c.social||"",
+        tags: c.tags||[], notes: c.notes||"", ava: c.ava||"🌙",
+        created: c.created||"", lastOrder: c.lastOrder||"",
+      }).catch(console.error));
       prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("customers", id).catch(console.error));
       return next;
     });
@@ -2618,7 +2626,7 @@ export default function App() {
       const next = typeof updater==="function" ? updater(prev) : updater;
       const prevIds = prev.map(r=>r.id);
       const nextIds = next.map(r=>r.id);
-      next.forEach(r => sb.upsert("replies", {...r, images: r.images ? JSON.stringify(r.images) : null}).catch(console.error));
+      next.forEach(r => sb.upsert("replies", {...r, images: JSON.stringify(r.images||[])}).catch(console.error));
       prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("replies", id).catch(console.error));
       return next;
     });
@@ -2632,12 +2640,23 @@ export default function App() {
     });
     setCustomers(p=>p.map(c=>c.id===o.custId?{...c,lastOrder:o.date}:c));
     try {
-      await sb.upsert("orders", {
-        ...o,
-        items: JSON.stringify(o.items),
-      });
-      // Also update customer lastOrder in DB
-      await sb.update("customers", o.custId, { lastOrder: o.date });
+      if (!o.id) return;
+      const orderRow = {
+        id: o.id,
+        custId: o.custId||null,
+        items: JSON.stringify(o.items||[]),
+        extraQ: o.extraQ||0,
+        total: o.total||0,
+        tips: o.tips||0,
+        status: o.status||"new",
+        date: o.date||"",
+        time: o.time||"",
+        notes: o.notes||"",
+      };
+      await sb.upsert("orders", orderRow);
+      if (o.custId) {
+        await sb.update("customers", o.custId, { lastOrder: o.date });
+      }
     } catch(e) { console.error("Save order:", e); }
   };
 
@@ -2683,7 +2702,15 @@ export default function App() {
     messages: <MessagesPage toast={toast} replies={replies} setReplies={setRepliesAndSync}/>,
     report:   <ReportPage orders={orders} customers={customers} services={services}/>,
     settings: <SettingsPage
-      logout={()=>setAuth(false)} toast={toast}
+      logout={()=>{
+          setAuth(false);
+          setDbReady(false);
+          setServices([]);
+          setCustomers([]);
+          setOrders([]);
+          setBookings([]);
+          setShop(DEFAULT_SHOP);
+        }} toast={toast}
       services={services} setServices={setServicesAndSync}
       shop={shop} setShop={setShopAndSync}
       topics={topics} setTopics={setTopicsAndSync}
@@ -2694,7 +2721,7 @@ export default function App() {
     <>
       <style>{CSS}</style>
       {!auth ? (
-        <Login onLogin={()=>setAuth(true)}/>
+        <Login onLogin={()=>{ setDbReady(false); setAuth(true); }}/>
       ) : (
         <div className="app">
           <SyncBanner/>
