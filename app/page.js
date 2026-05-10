@@ -2383,15 +2383,41 @@ function Login({onLogin}) {
         <div style={{fontSize:13,fontWeight:800,color:T.ink,opacity:.65,marginTop:4,letterSpacing:.5}}>Shop Manager · Tarot & Lenormand</div>
       </div>
       <div style={{background:T.card,border:`2.5px solid ${T.ink}`,borderRadius:20,padding:24,width:"100%",maxWidth:360,boxShadow:`5px 5px 0 ${T.ink}`,position:"relative",zIndex:1}}>
+        {/* Tab Đăng nhập / Đăng ký */}
+        <div style={{display:"flex",gap:8,marginBottom:18}}>
+          {[{k:"login",l:"Đăng nhập"},{k:"signup",l:"Đăng ký"}].map(t=>(
+            <button key={t.k} onClick={()=>{setTab(t.k);setErr("");}}
+              style={{flex:1,padding:"9px",borderRadius:10,border:`2px solid ${tab===t.k?T.ink:T.border}`,background:tab===t.k?T.ink:"transparent",fontFamily:"Nunito",fontWeight:800,fontSize:13,cursor:"pointer",color:tab===t.k?"#fff":T.muted,transition:"all .15s"}}>
+              {t.l}
+            </button>
+          ))}
+        </div>
         <div className="f"><label style={{color:T.muted}}>Email</label>
-          <input type="email" placeholder="email@example.com" value={f.e} onChange={e=>setF(p=>({...p,e:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&go()} style={{}}/>
+          <input type="email" placeholder="email@example.com" value={f.e}
+            onChange={e=>setF(p=>({...p,e:e.target.value}))}
+            onKeyDown={e=>e.key==="Enter"&&go()}/>
         </div>
         <div className="f"><label style={{color:T.muted}}>Mật khẩu</label>
-          <input type="password" placeholder="••••••••" value={f.p} onChange={e=>setF(p=>({...p,p:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&go()} style={{}}/>
+          <input type="password" placeholder="Tối thiểu 6 ký tự" value={f.p}
+            onChange={e=>setF(p=>({...p,p:e.target.value}))}
+            onKeyDown={e=>e.key==="Enter"&&go()}/>
         </div>
-        {err&&<div style={{color:"#FF6B6B",fontSize:13,fontWeight:600,marginBottom:10}}>⚠️ {err}</div>}
-        <button className="btn btn-yellow" onClick={go}>Đăng nhập</button>
-        
+        {tab==="signup"&&(
+          <div className="f"><label style={{color:T.muted}}>Xác nhận mật khẩu</label>
+            <input type="password" placeholder="Nhập lại mật khẩu" value={f.p2}
+              onChange={e=>setF(p=>({...p,p2:e.target.value}))}
+              onKeyDown={e=>e.key==="Enter"&&go()}/>
+          </div>
+        )}
+        {err&&<div style={{color:err.startsWith("✅")?T.green:T.red,fontSize:13,fontWeight:700,marginBottom:12,lineHeight:1.4}}>{err}</div>}
+        <button className="btn btn-yellow" onClick={go} disabled={load} style={{opacity:load?.6:1}}>
+          {load?"⏳ Đang xử lý...":(tab==="login"?"Đăng nhập 🐸":"Tạo tài khoản 🐸")}
+        </button>
+        {tab==="signup"&&(
+          <div style={{fontSize:11,color:T.muted,textAlign:"center",marginTop:10,lineHeight:1.5,fontWeight:600}}>
+            Sau khi đăng ký có thể đăng nhập ngay
+          </div>
+        )}
       </div>
     </div>
   );
