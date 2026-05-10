@@ -2380,9 +2380,8 @@ function Login({onLogin}) {
       <div style={{position:"absolute",bottom:95,right:10,fontSize:22,zIndex:1,transform:"rotate(-8deg)",opacity:.65}}>🐸</div>
       <div style={{position:"absolute",bottom:88,left:8,fontSize:16,zIndex:1,transform:"rotate(12deg)",opacity:.5}}>🐸</div>
       <div style={{position:"relative",zIndex:1,textAlign:"center",marginBottom:32}}>
-        <div style={{width:90,height:90,borderRadius:22,border:`3px solid ${T.ink}`,boxShadow:`5px 5px 0 ${T.ink}`,background:T.card,margin:"0 auto 14px",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <img src="/images/logo.jpg" alt="Logo" style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";e.target.parentNode.innerHTML="<div style='font-size:44px'>🐸</div>";}}/>
-        </div>
+        <div style={{fontSize:110,lineHeight:1,marginBottom:4,filter:"drop-shadow(0 6px 0 rgba(26,46,31,.2))",userSelect:"none",animation:"frogBob 2.5s ease-in-out infinite",display:"block",textAlign:"center"}}>🐸</div>
+        <style>{`@keyframes frogBob{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-10px) rotate(3deg)}}`}</style>
         <div style={{fontFamily:"Nunito",fontSize:38,fontWeight:900,color:T.ink,letterSpacing:-1}}>Mitchi</div>
         <div style={{fontSize:13,fontWeight:800,color:T.ink,opacity:.65,marginTop:4,letterSpacing:.5}}>Shop Manager · Tarot & Lenormand</div>
       </div>
