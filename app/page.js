@@ -318,10 +318,10 @@ function EmptyState({ico, title, sub, action, onAction}) {
 }
 
 // ── ORDER FORM ────────────────────────────────────────────────────────────────
-function OrderForm({order, customers, services, onSave, onClose, defaultCustId}) {
+function OrderForm({order, customers, services, onSave, onClose, defaultCustId, topics}) {
   const isEdit = !!order;
   const [custId, setCustId] = useState(order?.custId || defaultCustId || "");
-  const [items,  setItems]  = useState(order?.items  || [{svcId:"",qty:"",group:""}]);
+  const [items,  setItems]  = useState(order?.items  || [{svcId:"",qty:"",groups:[]}]);
   const [extraQ, setExtraQ] = useState(order?.extraQ || 0);
   const [notes,  setNotes]  = useState(order?.notes  || "");
   const [status, setStatus] = useState(order?.status || "new");
@@ -382,11 +382,29 @@ function OrderForm({order, customers, services, onSave, onClose, defaultCustId})
                   <input type="number" min="1" placeholder="Số câu hỏi" value={it.qty} onChange={e=>updItem(i,"qty",e.target.value)}
                     style={{width:"100%",padding:"9px 12px",borderRadius:10,border:`1.5px solid ${T.border2}`,background:T.card,fontFamily:"Nunito Sans",fontSize:13,fontWeight:600,outline:"none",marginBottom:8,color:T.ink}}/>
                 )}
-                <select style={{width:"100%",padding:"9px 10px",borderRadius:10,border:`1.5px solid ${T.border2}`,background:T.card,fontFamily:"Nunito Sans",fontSize:13,fontWeight:600,outline:"none",color:T.ink}}
-                  value={it.group} onChange={e=>updItem(i,"group",e.target.value)}>
-                  <option value="">Chủ đề câu hỏi...</option>
-                  {GROUPS.map(g=><option key={g}>{g}</option>)}
-                </select>
+                <div style={{marginTop:4}}>
+                  <div style={{fontSize:10,fontWeight:700,color:T.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>Chủ đề câu hỏi (chọn nhiều)</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {(topics||[]).map(g=>{
+                      const selected=(it.groups||[]).includes(g);
+                      return(
+                        <button key={g} type="button"
+                          onClick={()=>{
+                            const cur=it.groups||[];
+                            updItem(i,"groups",selected?cur.filter(x=>x!==g):[...cur,g]);
+                          }}
+                          style={{padding:"5px 11px",borderRadius:20,border:`1.5px solid ${selected?T.green:T.border2}`,background:selected?T.greenbg:T.card,fontFamily:"Nunito",fontWeight:700,fontSize:11,cursor:"pointer",color:selected?T.green:T.muted,transition:"all .12s"}}>
+                          {selected?"✓ ":""}{g}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {(it.groups||[]).length>0&&(
+                    <div style={{fontSize:11,color:T.green,fontWeight:700,marginTop:6}}>
+                      Đã chọn: {(it.groups||[]).join(", ")}
+                    </div>
+                  )}
+                </div>
                 {svc&&it.qty&&svc.type==="per_q"&&(
                   <div style={{fontSize:12,fontWeight:700,color:T.green,marginTop:6,textAlign:"right"}}>
                     → {vnd(calcQ(it.qty,svc.price,svc.price6))}
@@ -511,7 +529,8 @@ function InvoiceView({order, cust, services, toast, onClose, shop}) {
                 <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:r.total>0?T.invRed:"rgba(255,255,255,.3)"}}>{r.qty}</div>
                 <div>
                   <div style={{fontSize:11,fontWeight:600,color:"#fff",lineHeight:1.3}}>{r.desc}</div>
-                  {r.group&&<div style={{fontSize:9,color:T.gold,marginTop:2}}>📌 {r.group}</div>}
+                  {(r.groups||[]).length>0&&<div style={{fontSize:9,color:T.gold,marginTop:2}}>📌 {(r.groups||[]).join(" · ")}</div>}
+                  {r.group&&!(r.groups||[]).length&&<div style={{fontSize:9,color:T.gold,marginTop:2}}>📌 {r.group}</div>}
                 </div>
                 <div style={{fontSize:11,color:"rgba(255,255,255,.6)",fontWeight:600}}>{vnd(r.unit)}</div>
                 <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:12,color:r.total>0?"#fff":"rgba(255,255,255,.3)"}}>{vnd(r.total)}</div>
@@ -524,15 +543,13 @@ function InvoiceView({order, cust, services, toast, onClose, shop}) {
             </div>
           </div>
 
-          <div style={{margin:"0 16px 14px",background:"rgba(255,255,255,.06)",borderRadius:12,border:"1px solid rgba(232,201,122,.15)",padding:12,display:"flex",gap:12,alignItems:"center"}}>
+          <div style={{margin:"0 16px 14px",background:"rgba(255,255,255,.06)",borderRadius:12,border:"1px solid rgba(232,201,122,.15)",padding:14,textAlign:"center"}}>
             <img src={qr==="acb"?"/images/qr-acb.jpg":"/images/qr-vcb.jpg"} alt="QR"
-              style={{width:84,height:84,borderRadius:8,objectFit:"cover",border:`1.5px solid ${T.gold}`,flexShrink:0}}
-              onError={e=>{e.target.outerHTML=`<div style="width:84px;height:84px;background:rgba(255,255,255,.1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:28px;border:1.5px solid ${T.gold}">📱</div>`;}}/>
-            <div>
-              <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:3}}>Ngân hàng: {qr==="acb"?(shop?.acbNo?"ACB — "+(shop?.acbName||""):"ACB (Á Châu)"):(shop?.vcbNo?"Vietcombank — "+(shop?.vcbName||""):"Vietcombank")}</div>
-              <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.75)",marginBottom:2}}>Số TK: {qr==="acb"?(shop?.acbNo||"6205237"):(shop?.vcbNo||"—")}</div>
-              <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.75)"}}>Chủ TK: {qr==="acb"?(shop?.acbName||"TON NU HONG CHAU"):(shop?.vcbName||"TON NU HONG CHAU")}</div>
-            </div>
+              style={{width:160,height:160,borderRadius:12,objectFit:"cover",border:`2px solid ${T.gold}`,display:"block",margin:"0 auto 10px"}}
+              onError={e=>{e.target.outerHTML=`<div style="width:160px;height:160px;background:rgba(255,255,255,.1);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:52px;border:2px solid ${T.gold};margin:0 auto 10px">📱</div>`;}}/>
+            <div style={{fontSize:14,fontWeight:800,color:"#fff",marginBottom:3}}>Ngân hàng: {qr==="acb"?(shop?.acbNo?"ACB — "+(shop?.acbName||""):"ACB (Á Châu)"):(shop?.vcbNo?"Vietcombank — "+(shop?.vcbName||""):"Vietcombank")}</div>
+            <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.75)",marginBottom:2}}>Số TK: <strong>{qr==="acb"?(shop?.acbNo||"6205237"):(shop?.vcbNo||"—")}</strong></div>
+            <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.75)"}}>Chủ TK: {qr==="acb"?(shop?.acbName||"TON NU HONG CHAU"):(shop?.vcbName||"TON NU HONG CHAU")}</div>
           </div>
 
           <div style={{textAlign:"center",padding:"4px 16px 14px"}}>
@@ -645,7 +662,8 @@ function OrderDetail({order, customers, services, onUpdate, onDelete, onClose, t
               <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"10px 0",borderBottom:i<order.items.length-1?`1px dashed ${T.border}`:"none"}}>
                 <div>
                   <div style={{fontSize:14,fontWeight:700}}>{svc.ico} {svc.name}{svc.type==="per_q"?` · ${it.qty} câu`:""}</div>
-                  {it.group&&<div style={{fontSize:11,color:T.purple,fontWeight:600,marginTop:2}}>📌 {it.group}</div>}
+                  {(it.groups||[]).length>0&&<div style={{fontSize:11,color:T.purple,fontWeight:600,marginTop:2}}>📌 {(it.groups||[]).join(" · ")}</div>}
+                  {it.group&&!(it.groups||[]).length&&<div style={{fontSize:11,color:T.purple,fontWeight:600,marginTop:2}}>📌 {it.group}</div>}
                 </div>
                 <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14,color:T.green}}>{vnd(amt)}</div>
               </div>
@@ -703,10 +721,12 @@ function OrderDetail({order, customers, services, onUpdate, onDelete, onClose, t
         {/* Delete confirm */}
         {confirm&&(
           <div className="card card-red" style={{marginTop:12}}>
-            <div style={{fontWeight:700,marginBottom:10,color:T.red}}>Huỷ đơn này?</div>
+            <div style={{fontWeight:800,marginBottom:4,color:T.red}}>⚠️ Xử lý đơn này?</div>
+            <div style={{fontSize:12,color:T.muted,marginBottom:12}}>Huỷ = đổi trạng thái Huỷ · Xoá = xoá vĩnh viễn</div>
             <div style={{display:"flex",gap:8}}>
-              <button className="btn btn-red" style={{flex:1}} onClick={()=>{onUpdate({...order,status:"cancel"});setConfirm(false);toast("🗑 Đã huỷ đơn!");}}>Huỷ đơn</button>
-              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setConfirm(false)}>Không</button>
+              <button className="btn btn-red" style={{flex:1,fontSize:12}} onClick={()=>{onUpdate({...order,status:"cancel"});setConfirm(false);toast("🗑 Đã huỷ đơn!");}}>🚫 Huỷ đơn</button>
+              <button className="btn btn-red" style={{flex:1,fontSize:12,background:"#7B0000"}} onClick={()=>{onDelete(order.id);onClose();toast("🗑 Đã xoá đơn vĩnh viễn!");}}>🗑 Xoá hẳn</button>
+              <button className="btn btn-ghost" style={{flex:1,fontSize:12}} onClick={()=>setConfirm(false)}>Không</button>
             </div>
           </div>
         )}
@@ -716,7 +736,7 @@ function OrderDetail({order, customers, services, onUpdate, onDelete, onClose, t
 }
 
 // ── ORDERS PAGE ───────────────────────────────────────────────────────────────
-function OrdersPage({orders, setOrders, saveOrder, customers, services, toast, defaultCustId, clearDefaultCust, shop}) {
+function OrdersPage({orders, setOrders, saveOrder, customers, services, toast, defaultCustId, clearDefaultCust, shop, topics, setTopics}) {
   const [filter,   setFilter]   = useState("all");
   const [showNew,  setShowNew]  = useState(!!defaultCustId);
   const [selId,    setSelId]    = useState(null);
@@ -780,8 +800,8 @@ function OrdersPage({orders, setOrders, saveOrder, customers, services, toast, d
 
       <button className="fab" onClick={()=>setShowNew(true)}>{I.plus}</button>
 
-      {showNew&&<OrderForm customers={customers} services={services} onSave={saveNew} onClose={()=>{setShowNew(false);clearDefaultCust();}} defaultCustId={defaultCustId}/>}
-      {selId&&selOrder&&<OrderDetail order={selOrder} customers={customers} services={services} onUpdate={upd} onClose={()=>setSelId(null)} toast={toast} shop={shop}/>}
+      {showNew&&<OrderForm customers={customers} services={services} onSave={saveNew} onClose={()=>{setShowNew(false);clearDefaultCust();}} defaultCustId={defaultCustId} topics={topics}/>}
+      {selId&&selOrder&&<OrderDetail order={selOrder} customers={customers} services={services} onUpdate={upd} onDelete={id=>{setOrders(p=>p.filter(o=>o.id!==id));setSelId(null);}} onClose={()=>setSelId(null)} toast={toast} shop={shop}/>}
     </div>
   );
 }
@@ -920,7 +940,7 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
               <div style={{flex:1}}>
                 <div style={{fontSize:13,fontWeight:700}}>{o.items.map(it=>{const s=services.find(x=>x.id===it.svcId);return s?`${s.ico} ${s.name}`:""}).filter(Boolean).join(" + ")}</div>
                 <div style={{fontSize:11,color:T.muted}}>{o.date} · {o.time}</div>
-                {o.items.map((it,i)=>it.group?<span key={i} style={{fontSize:10,color:T.purple,fontWeight:600,marginRight:6}}>📌 {it.group}</span>:null)}
+                {o.items.map((it,idx)=>(it.groups||[]).length>0?<span key={idx} style={{fontSize:10,color:T.purple,fontWeight:600,marginRight:6}}>📌 {(it.groups||[]).join("·")}</span>:it.group?<span key={idx} style={{fontSize:10,color:T.purple,fontWeight:600,marginRight:6}}>📌 {it.group}</span>:null)}
               </div>
               <div style={{textAlign:"right"}}>
                 <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14}}>{vnd(o.total)}</div>
@@ -1470,9 +1490,11 @@ function ReportPage({orders, customers, services}) {
   // Group stats
   const groupStats = [];
   activeOrders.forEach(o=>o.items.forEach(it=>{
-    if(!it.group) return;
-    const ex=groupStats.find(g=>g.n===it.group);
-    if(ex) ex.c++; else groupStats.push({n:it.group,c:1});
+    const grps=(it.groups&&it.groups.length)?it.groups:(it.group?[it.group]:[]);
+    grps.forEach(g=>{
+      const ex=groupStats.find(x=>x.n===g);
+      if(ex) ex.c++; else groupStats.push({n:g,c:1});
+    });
   }));
   groupStats.sort((a,b)=>b.c-a.c);
 
@@ -1865,8 +1887,81 @@ function PwaInfo({onClose}) {
   );
 }
 
+// ── TOPIC MANAGER — quản lý chủ đề câu hỏi ──────────────────────────────────
+function TopicManager({topics, setTopics, toast}) {
+  const [newTopic, setNewTopic] = useState("");
+  const [editing, setEditing] = useState(null); // {idx, val}
+
+  const add = () => {
+    const t = newTopic.trim();
+    if(!t) return;
+    if(topics.includes(t)) { toast("⚠️ Chủ đề đã tồn tại!"); return; }
+    setTopics(p=>[...p, t]);
+    setNewTopic("");
+    toast("✅ Đã thêm chủ đề!");
+  };
+
+  const del = idx => {
+    setTopics(p=>p.filter((_,i)=>i!==idx));
+    toast("🗑 Đã xoá chủ đề!");
+  };
+
+  const saveEdit = () => {
+    if(!editing) return;
+    const t = editing.val.trim();
+    if(!t) return;
+    setTopics(p=>p.map((x,i)=>i===editing.idx?t:x));
+    setEditing(null);
+    toast("✅ Đã sửa chủ đề!");
+  };
+
+  return(
+    <div style={{marginBottom:16}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={{fontFamily:"Nunito",fontWeight:700,fontSize:11,color:T.muted,textTransform:"uppercase",letterSpacing:1}}>
+          Chủ đề câu hỏi ({topics.length})
+        </div>
+      </div>
+
+      {/* Add new topic */}
+      <div style={{display:"flex",gap:8,marginBottom:12}}>
+        <input value={newTopic} onChange={e=>setNewTopic(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&add()}
+          placeholder="Thêm chủ đề mới..." 
+          style={{flex:1,padding:"9px 12px",borderRadius:10,border:`2px solid ${T.ink}`,background:T.card,fontFamily:"Nunito Sans",fontSize:13,fontWeight:600,outline:"none",boxShadow:`2px 2px 0 ${T.ink}`,color:T.ink}}/>
+        <button className="xs xs-green" onClick={add} style={{flexShrink:0}}>+ Thêm</button>
+      </div>
+
+      {/* Topic list */}
+      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+        {topics.map((t,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:8,background:T.card,borderRadius:10,border:`1.5px solid ${T.ink}`,padding:"8px 12px",boxShadow:`2px 2px 0 ${T.ink}`}}>
+            {editing?.idx===i ? (
+              <>
+                <input value={editing.val} onChange={e=>setEditing(p=>({...p,val:e.target.value}))}
+                  onKeyDown={e=>e.key==="Enter"&&saveEdit()}
+                  style={{flex:1,padding:"5px 8px",borderRadius:8,border:`1.5px solid ${T.green}`,fontFamily:"Nunito Sans",fontSize:13,fontWeight:600,outline:"none",color:T.ink}}
+                  autoFocus/>
+                <button className="xs xs-green" style={{padding:"5px 10px",fontSize:11}} onClick={saveEdit}>✓</button>
+                <button className="xs" style={{padding:"5px 10px",fontSize:11}} onClick={()=>setEditing(null)}>✕</button>
+              </>
+            ) : (
+              <>
+                <div style={{flex:1,fontSize:13,fontWeight:700,color:T.ink}}>📌 {t}</div>
+                <button className="xs" style={{padding:"5px 10px",fontSize:11}} onClick={()=>setEditing({idx:i,val:t})}>✏️</button>
+                <button className="xs xs-red" style={{padding:"5px 10px",fontSize:11}} onClick={()=>del(i)}>🗑</button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
 // ── SETTINGS PAGE ─────────────────────────────────────────────────────────────
-function SettingsPage({logout, toast, services, setServices, shop, setShop}) {
+function SettingsPage({logout, toast, services, setServices, shop, setShop, topics, setTopics}) {
   const [section, setSection] = useState(null);
 
   return(
@@ -1885,6 +1980,9 @@ function SettingsPage({logout, toast, services, setServices, shop, setShop}) {
         </div>
 
         <ServiceManager services={services} setServices={setServices} toast={toast}/>
+
+        <div style={{fontFamily:"Nunito",fontWeight:700,fontSize:11,color:T.muted,textTransform:"uppercase",letterSpacing:1,margin:"20px 0 10px"}}>Chủ đề câu hỏi</div>
+        <TopicManager topics={topics} setTopics={setTopics} toast={toast}/>
 
         <div style={{fontFamily:"Nunito",fontWeight:700,fontSize:11,color:T.muted,textTransform:"uppercase",letterSpacing:1,margin:"20px 0 10px"}}>Shop & Tài Khoản</div>
 
@@ -2207,11 +2305,34 @@ const DEFAULT_SHOP = {
 };
 
 // Load html2canvas for PNG export
-if (typeof window !== "undefined" && !window.html2canvas) {
-  const s = document.createElement("script");
-  s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-  s.async = true;
-  document.head.appendChild(s);
+if (typeof window !== "undefined") {
+  // Add PWA manifest if not present
+  if (!document.querySelector('link[rel="manifest"]')) {
+    const manifestData = {
+      name: "Mitchi Shop Manager",
+      short_name: "Mitchi",
+      description: "Quản lý shop Tarot & Lenormand",
+      start_url: "/",
+      display: "standalone",
+      background_color: "#EFF9F0",
+      theme_color: "#1A2E1F",
+      icons: [
+        { src: "/images/logo.jpg", sizes: "192x192", type: "image/jpeg", purpose: "any maskable" },
+        { src: "/images/logo.jpg", sizes: "512x512", type: "image/jpeg", purpose: "any" }
+      ]
+    };
+    const blob = new Blob([JSON.stringify(manifestData)],{type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("link");
+    link.rel = "manifest"; link.href = url;
+    document.head.appendChild(link);
+  }
+  if (!window.html2canvas) {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+    s.async = true;
+    document.head.appendChild(s);
+  }
 }
 
 export default function App() {
@@ -2225,6 +2346,7 @@ export default function App() {
   const [defCustId, setDefCustId] = useState(null);
   const [shop,      setShop]      = useState(DEFAULT_SHOP);
   const [replies,   setReplies]   = useState(REPLIES);
+  const [topics,    setTopics]    = useState(["Tình yêu","Hôn nhân / Ex","Sự nghiệp","Tài chính","Gia đình","Sức khỏe","Tổng quát"]);
 
   const toast = msg => { setToast(msg); setTimeout(()=>setToast(""), 2500); };
   const nav   = id  => setPage(id);
@@ -2252,6 +2374,7 @@ export default function App() {
       orders={orders} setOrders={setOrders} saveOrder={saveOrder}
       customers={customers} services={services} toast={toast}
       defaultCustId={defCustId} clearDefaultCust={clearDef} shop={shop}
+      topics={topics} setTopics={setTopics}
     />,
     customers: <CustomersPage
       customers={customers} setCustomers={setCustomers}
@@ -2270,6 +2393,7 @@ export default function App() {
       logout={()=>setAuth(false)} toast={toast}
       services={services} setServices={setServices}
       shop={shop} setShop={setShop}
+      topics={topics} setTopics={setTopics}
     />,
   };
 
