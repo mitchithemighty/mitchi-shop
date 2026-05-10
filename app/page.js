@@ -33,6 +33,80 @@ const T = {
   gold:    "#E8C97A",
 };
 
+// ── SUPABASE CLIENT ───────────────────────────────────────────────────────────
+const SB_URL = "https://snjbfdgjvdcogmdxuetl.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuamJmZGdqdmRjb2dtZHh1ZXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNjQ3NzEsImV4cCI6MjA5Mzk0MDc3MX0.PmrsxdtLRzlGXzMEPyJLea0nt2xCBNoNv5_OSS3vkCg";
+
+async function sbFetch(path, opts={}) {
+  const res = await fetch(SB_URL + "/rest/v1" + path, {
+    headers: {
+      "apikey": SB_KEY,
+      "Authorization": "Bearer " + SB_KEY,
+      "Content-Type": "application/json",
+      "Prefer": opts.prefer || "return=representation",
+      ...opts.headers,
+    },
+    ...opts,
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Supabase ${res.status}: ${err}`);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
+}
+
+// CRUD helpers
+const sb = {
+  // SELECT all rows
+  getAll: (table, order="created_at.desc") =>
+    sbFetch(`/${table}?order=${order}&limit=1000`),
+
+  // INSERT one row
+  insert: (table, row) =>
+    sbFetch(`/${table}`, { method:"POST", body:JSON.stringify(row) }),
+
+  // UPSERT (insert or update by id)
+  upsert: (table, row) =>
+    sbFetch(`/${table}`, {
+      method:"POST", body:JSON.stringify(row),
+      prefer:"resolution=merge-duplicates,return=representation",
+      headers: { "Prefer":"resolution=merge-duplicates,return=representation" }
+    }),
+
+  // UPDATE by id
+  update: (table, id, data) =>
+    sbFetch(`/${table}?id=eq.${id}`, { method:"PATCH", body:JSON.stringify(data) }),
+
+  // DELETE by id
+  delete: (table, id) =>
+    sbFetch(`/${table}?id=eq.${id}`, { method:"DELETE", prefer:"" }),
+
+  // DELETE all in table
+  deleteAll: (table) =>
+    sbFetch(`/${table}?id=neq.00000000-0000-0000-0000-000000000000`, { method:"DELETE", prefer:"" }),
+};
+
+
+// ── SUPABASE AUTH ─────────────────────────────────────────────────────────────
+const SB_AUTH_URL = "https://snjbfdgjvdcogmdxuetl.supabase.co/auth/v1";
+
+async function sbAuth(action, email, password) {
+  // action: "token?grant_type=password" for login, "signup" for register
+  const res = await fetch(`${SB_AUTH_URL}/${action}`, {
+    method: "POST",
+    headers: {
+      "apikey": SB_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.msg || data.error_description || "Lỗi xác thực");
+  return data;
+}
+
+
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&family=Nunito+Sans:wght@400;500;600;700&display=swap');
 
@@ -259,44 +333,21 @@ const GROUPS = ["Tình yêu","Hôn nhân / Ex","Sự nghiệp","Tài chính","Gi
 const AVAS = ["🌙","🌸","⭐","🦋","🌺","🌊","💫","🔮","🌈","🎴","🌿","🪷"];
 const ICOS = ["💜","⭐","🌙","✨","🔮","🌟","🌸","🦋","🌈","🎴","🌊","🔥"];
 const REPLIES = [
-  {id:1,hash:"#menu",   title:"Menu dịch vụ",       body:"✨ MITCHI THE MIGHTY ✨\nTarot & Lenormand Reader\n\n💜 Tarot Tình Yêu: 20k/câu\n⭐ Tarot Sự Nghiệp: 20k/câu\n🌙 Lenormand Tổng Quát: 100k trọn gói\n\n📌 5 câu đầu: 20k/câu\n📌 Từ câu 6+: 15k/câu\n\nInbox để đặt lịch nha bạn 🌙"},
-  {id:2,hash:"#baogia", title:"Báo giá",             body:"Chào bạn! ✨\nGiá xem của Mitchi:\n• 5 câu đầu: 20.000đ/câu = 100.000đ\n• Từ câu 6+: 15.000đ/câu\nVD: 7 câu = 100k + 30k = 130.000đ 💜"},
-  {id:3,hash:"#booking",title:"Hướng dẫn đặt lịch", body:"Đặt lịch với Mitchi:\n1️⃣ Nhắn câu hỏi muốn xem\n2️⃣ Mitchi báo giá & xác nhận\n3️⃣ Xem bài → nhận hóa đơn\n4️⃣ Chuyển khoản là xong ✨"},
-  {id:4,hash:"#thanhtoan",title:"Nhắc thanh toán",  body:"Bạn ơi đây là hóa đơn xem bài của mình nhé! 🌙\nBạn chuyển khoản giúp Mitchi với nha 💜\nThông tin CK có trong hóa đơn ạ!"},
-  {id:5,hash:"#trabai",  title:"Trả kết quả",       body:"Mitchi đã xem xong cho bạn rồi nhé! ✨\n[Đính kèm ảnh kết quả + hóa đơn]\nCó thắc mắc gì cứ nhắn Mitchi nha 🌙"},
-  {id:6,hash:"#camon",   title:"Cảm ơn",            body:"Cảm ơn bạn đã tin tưởng Mitchi! 💜✨\nMong bài mang năng lượng tích cực cho bạn~\nHẹn gặp lại lần sau nhé 🌙"},
-  {id:7,hash:"#followup",title:"Follow-up",         body:"Dạo này bạn thế nào rồi? 🌙\nMitchi đang nghĩ đến bạn ~\nNếu có chuyện cần chia sẻ hay xem bài, cứ nhắn Mitchi nha 💜"},
+  {id:"r1",hash:"#menu",   title:"Menu dịch vụ",       body:"✨ MITCHI THE MIGHTY ✨\nTarot & Lenormand Reader\n\nInbox để đặt lịch nha bạn 🌙",images:[]},
+  {id:"r2",hash:"#baogia", title:"Báo giá",             body:"Chào bạn! ✨\nGiá xem của Mitchi:\n• 5 câu đầu: 20.000đ/câu = 100.000đ\n• Từ câu 6+: 15.000đ/câu 💜",images:[]},
+  {id:"r3",hash:"#thanhtoan",title:"Nhắc thanh toán",  body:"Bạn ơi đây là hóa đơn xem bài nhé! 🌙\nBạn chuyển khoản giúp Mitchi với nha 💜",images:[]},
+  {id:"r4",hash:"#trabai",  title:"Trả kết quả",       body:"Mitchi đã xem xong cho bạn rồi nhé! ✨\n[Đính kèm ảnh kết quả + hóa đơn]\nCó thắc mắc gì cứ nhắn Mitchi nha 🌙",images:[]},
+  {id:"r5",hash:"#camon",   title:"Cảm ơn",            body:"Cảm ơn bạn đã tin tưởng Mitchi! 💜✨\nMong bài mang năng lượng tích cực cho bạn~",images:[]},
+  {id:"r6",hash:"#followup",title:"Follow-up",         body:"Dạo này bạn thế nào rồi? 🌙\nMitchi đang nghĩ đến bạn ~\nNếu có chuyện cần chia sẻ hay xem bài, cứ nhắn Mitchi nha 💜",images:[]},
 ];
 const WEEK_DAYS = ["T2","T3","T4","T5","T6","T7","CN"];
 const WEEK_COLORS = [T.green, T.blue, T.yellow, T.green, "#52B788", T.purple, T.red];
 
 // ── SEED DATA ─────────────────────────────────────────────────────────────────
-const SEED_SVCS = [
-  {id:"s1",name:"Tarot Tình Yêu",   ico:"💜",type:"per_q",price:20000,price6:15000,dur:60,active:true,sold:42},
-  {id:"s2",name:"Tarot Sự Nghiệp",  ico:"⭐",type:"per_q",price:20000,price6:15000,dur:60,active:true,sold:28},
-  {id:"s3",name:"Lenormand Tổng Quát",ico:"🌙",type:"fixed",price:100000,price6:0,dur:45,active:true,sold:19},
-  {id:"s4",name:"Tarot Tổng Quát",  ico:"✨",type:"per_q",price:20000,price6:15000,dur:60,active:true,sold:15},
-];
-const SEED_CUSTS = [
-  {id:"c1",name:"Linh Nguyễn",  nick:"Bé Linh",  phone:"0901234567",social:"fb/linhng",  tags:["vip","old"],ava:"🌸",notes:"Hay hỏi về tình yêu",created:"01/01/2025",lastOrder:"08/05/2025"},
-  {id:"c2",name:"Minh Châu",    nick:"Châu",      phone:"0912345678",social:"zalo/mc",    tags:["new"],      ava:"⭐",notes:"",created:todayStr(),lastOrder:todayStr()},
-  {id:"c3",name:"Thu Hà",       nick:"Hà Trắng", phone:"0923456789",social:"tele/thuha", tags:["old","fu"],  ava:"🌙",notes:"Hay lo lắng về sự nghiệp",created:"10/02/2025",lastOrder:"01/04/2025"},
-  {id:"c4",name:"Mai Anh",      nick:"Mai",       phone:"0945678901",social:"fb/maianh", tags:["vip","old"], ava:"🦋",notes:"VIP, tips nhiều",created:"15/01/2025",lastOrder:"05/05/2025"},
-  {id:"c5",name:"Ngọc Trân",    nick:"Trân",      phone:"0956789012",social:"zalo/ngtr",  tags:["old","fu"],  ava:"🌺",notes:"",created:"20/03/2025",lastOrder:"10/03/2025"},
-];
-const SEED_ORDERS = [
-  {id:"o1",custId:"c1",items:[{svcId:"s1",qty:7,group:"Tình yêu"}],   extraQ:0,total:110000,tips:50000,status:"paid",  date:"08/05/2025",time:"09:30",notes:"Xem xong hài lòng"},
-  {id:"o2",custId:"c2",items:[{svcId:"s3",qty:1,group:"Tổng quát"}],  extraQ:0,total:100000,tips:0,    status:"done",  date:todayStr(),  time:"11:00",notes:""},
-  {id:"o3",custId:"c3",items:[{svcId:"s2",qty:5,group:"Sự nghiệp"}],  extraQ:2,total:130000,tips:0,    status:"view",  date:todayStr(),  time:"14:00",notes:""},
-  {id:"o4",custId:"c4",items:[{svcId:"s1",qty:5,group:"Tình yêu"},{svcId:"s2",qty:3,group:"Sự nghiệp"}],extraQ:0,total:160000,tips:100000,status:"paid",date:"07/05/2025",time:"16:00",notes:""},
-  {id:"o5",custId:"c5",items:[{svcId:"s4",qty:4,group:"Tổng quát"}],  extraQ:0,total:80000, tips:0,    status:"new",   date:todayStr(),  time:"15:30",notes:"Khách mới"},
-];
-const SEED_BOOKINGS = [
-  {id:"b1",custId:"c1",svcId:"s1",date:todayStr(),time:"09:30",status:"confirmed",notes:"Hỏi về bạn trai mới"},
-  {id:"b2",custId:"c2",svcId:"s3",date:todayStr(),time:"11:00",status:"confirmed",notes:""},
-  {id:"b3",custId:"c3",svcId:"s2",date:todayStr(),time:"14:00",status:"confirmed",notes:"Muốn đổi việc"},
-  {id:"b4",custId:"c5",svcId:"s4",date:todayStr(),time:"15:30",status:"pending",  notes:"Khách mới, chưa xác nhận"},
-];
+const SEED_SVCS = [];
+const SEED_CUSTS = [];
+const SEED_ORDERS = [];
+const SEED_BOOKINGS = [];
 
 // ── SHARED COMPONENTS ─────────────────────────────────────────────────────────
 function Badge({s}) {
@@ -325,6 +376,8 @@ function OrderForm({order, customers, services, onSave, onClose, defaultCustId, 
   const [extraQ, setExtraQ] = useState(order?.extraQ || 0);
   const [notes,  setNotes]  = useState(order?.notes  || "");
   const [status, setStatus] = useState(order?.status || "new");
+  const [oDate,  setODate]  = useState(order?.date   || todayStr());
+  const [oTime,  setOTime]  = useState(order?.time   || nowStr());
   const [err,    setErr]    = useState("");
 
   const addItem = () => setItems(p=>[...p,{svcId:"",qty:"",group:""}]);
@@ -343,8 +396,8 @@ function OrderForm({order, customers, services, onSave, onClose, defaultCustId, 
       extraQ: parseInt(extraQ)||0,
       total, tips: order?.tips||0,
       status, notes,
-      date: order?.date || todayStr(),
-      time: order?.time || nowStr(),
+      date: oDate || todayStr(),
+      time: oTime || nowStr(),
     });
   };
 
@@ -443,6 +496,22 @@ function OrderForm({order, customers, services, onSave, onClose, defaultCustId, 
         <div className="f">
           <label>Ghi chú</label>
           <textarea placeholder="Ghi chú về buổi xem..." value={notes} onChange={e=>setNotes(e.target.value)}/>
+        </div>
+
+        <div style={{display:"flex",gap:8}}>
+          <div className="f" style={{flex:1}}>
+            <label>Ngày xem (có thể chọn quá khứ)</label>
+            <input type="text" placeholder="DD/MM/YYYY" value={oDate}
+              onChange={e=>setODate(e.target.value)}/>
+          </div>
+          <div className="f" style={{flex:1}}>
+            <label>Giờ</label>
+            <input type="time" value={oTime.replace(/[^0-9:]/g,"")||""}
+              onChange={e=>{
+                const t=e.target.value;
+                if(t) setOTime(t.slice(0,5));
+              }}/>
+          </div>
         </div>
 
         {total>0&&(
@@ -801,7 +870,7 @@ function OrdersPage({orders, setOrders, saveOrder, customers, services, toast, d
       <button className="fab" onClick={()=>setShowNew(true)}>{I.plus}</button>
 
       {showNew&&<OrderForm customers={customers} services={services} onSave={saveNew} onClose={()=>{setShowNew(false);clearDefaultCust();}} defaultCustId={defaultCustId} topics={topics}/>}
-      {selId&&selOrder&&<OrderDetail order={selOrder} customers={customers} services={services} onUpdate={upd} onDelete={id=>{setOrders(p=>p.filter(o=>o.id!==id));setSelId(null);}} onClose={()=>setSelId(null)} toast={toast} shop={shop}/>}
+      {selId&&selOrder&&<OrderDetail order={selOrder} customers={customers} services={services} onUpdate={upd} onDelete={id=>{deleteOrder(id);setSelId(null);}} onClose={()=>setSelId(null)} toast={toast} shop={shop}/>}
     </div>
   );
 }
@@ -814,7 +883,7 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
   const [delConf, setDelConf] = useState(false);
   const [tab,     setTab]     = useState("all");
   const [search,  setSearch]  = useState("");
-  const [form,    setForm]    = useState({name:"",nick:"",phone:"",social:"",notes:"",ava:"🌙"});
+  const [form,    setForm]    = useState({name:"",nick:"",phone:"",social:"",notes:"",ava:"🌙",created:todayStr()});
 
   const custOrders = id => orders.filter(o=>o.custId===id);
   const totalSpent = id => custOrders(id).filter(o=>o.status==="paid").reduce((s,o)=>s+o.total,0);
@@ -838,7 +907,7 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
   const TAG_MAP = {vip:["👑 VIP","tg-vip"],new:["✨ Mới","tg-new"],fu:["📌 Follow","tg-fu"],old:["🔄 Cũ","tg-old"],tip:["💜 Tipper","tg-tip"]};
 
   const openNew  = () => { setForm({name:"",nick:"",phone:"",social:"",notes:"",ava:"🌙"}); setEditC(null); setModal(true); };
-  const openEdit = c => { setForm({name:c.name,nick:c.nick||"",phone:c.phone||"",social:c.social||"",notes:c.notes||"",ava:c.ava||"🌙"}); setEditC(c); setModal(true); };
+  const openEdit = c => { setForm({name:c.name,nick:c.nick||"",phone:c.phone||"",social:c.social||"",notes:c.notes||"",ava:c.ava||"🌙",created:c.created||todayStr()}); setEditC(c); setModal(true); };
 
   const save = () => {
     if(!form.name.trim()) return;
@@ -1034,7 +1103,7 @@ function CustomerModal({form, setForm, onSave, onClose, isEdit}) {
               style={{background:form.ava===a?T.ink:"transparent",border:`1.5px solid ${form.ava===a?T.ink:T.border}`}}>{a}</button>
           ))}</div>
         </div>
-        {[{l:"Tên đầy đủ",k:"name",p:"Nguyễn Thị A"},{l:"Nickname",k:"nick",p:"Bé A"},{l:"Số điện thoại",k:"phone",p:"0912345678",t:"tel"},{l:"Zalo / Facebook",k:"social",p:"Tên hoặc link"}].map(x=>(
+        {[{l:"Tên đầy đủ",k:"name",p:"Nguyễn Thị A"},{l:"Nickname",k:"nick",p:"Bé A"},{l:"Số điện thoại",k:"phone",p:"0912345678",t:"tel"},{l:"Zalo / Facebook",k:"social",p:"Tên hoặc link"},{l:"Ngày trở thành khách (DD/MM/YYYY)",k:"created",p:"01/01/2025"}].map(x=>(
           <div className="f" key={x.k}>
             <label>{x.l}</label>
             <input type={x.t||"text"} placeholder={x.p} value={form[x.k]||""} onChange={e=>setForm(p=>({...p,[x.k]:e.target.value}))}/>
@@ -1506,8 +1575,20 @@ function ReportPage({orders, customers, services}) {
     cnt:orders.filter(o=>o.custId===c.id).length,
   })).filter(c=>c.tips>0||c.spent>0).sort((a,b)=>b.spent+b.tips-(a.spent+a.tips));
 
-  const WEEK_DATA = [320000,510000,280000,620000,450000,780000,590000];
-  const maxW = Math.max(...WEEK_DATA);
+  const WEEK_DATA = (() => {
+    const result = [0,0,0,0,0,0,0];
+    const today2 = new Date();
+    paidOrders.forEach(o=>{
+      if(!o.date) return;
+      const [d,m,y] = (o.date||"").split("/").map(Number);
+      if(!d||!m||!y) return;
+      const oDate = new Date(y,m-1,d);
+      const diff = Math.floor((today2-oDate)/(86400000));
+      if(diff>=0&&diff<7) result[6-diff] += Number(o.total||0);
+    });
+    return result;
+  })();
+  const maxW = Math.max(...WEEK_DATA,1);
 
   const COLS = [T.green,T.blue,T.yellow,T.green,T.greenlt,T.purple,T.red];
 
@@ -2028,11 +2109,34 @@ function Dashboard({nav, orders, setOrders, customers, services, bookings, setBo
   const pendingBks = todayBks.filter(b=>b.status==="pending").length;
 
   const custOrders = id => orders.filter(o=>o.custId===id);
-  const daysSince  = dateStr => { if(!dateStr||dateStr==="-") return 999; const [d,m,y]=dateStr.split("/").map(Number); return Math.floor((new Date()-new Date(y,m-1,d))/(86400000)); };
+  const daysSince  = dateStr => {
+    if(!dateStr||dateStr==="-"||dateStr==="") return 999;
+    try {
+      let d,m,y;
+      if(dateStr.includes("/")) {[d,m,y]=dateStr.split("/").map(Number);}
+      else if(dateStr.includes("-")) {[y,m,d]=dateStr.split("-").map(Number);}
+      else return 999;
+      if(!d||!m||!y) return 999;
+      return Math.floor((new Date()-new Date(y,m-1,d))/(86400000));
+    } catch { return 999; }
+  };
   const needFollowUp = customers.filter(c=>daysSince(c.lastOrder||"")>21&&custOrders(c.id).length>0);
   const topSvc = [...services].filter(s=>s.active).sort((a,b)=>b.sold-a.sold)[0];
-  const WEEK_DATA=[320000,510000,280000,620000,450000,780000,590000];
-  const maxW=Math.max(...WEEK_DATA);
+  // Compute real revenue for last 7 days
+  const WEEK_DATA = (() => {
+    const result = [0,0,0,0,0,0,0];
+    const today2 = new Date();
+    orders.filter(o=>o.status==="paid").forEach(o=>{
+      if(!o.date) return;
+      const [d,m,y] = (o.date||"").split("/").map(Number);
+      if(!d||!m||!y) return;
+      const oDate = new Date(y,m-1,d);
+      const diff = Math.floor((today2-oDate)/(86400000));
+      if(diff>=0&&diff<7) result[6-diff] += Number(o.total||0);
+    });
+    return result;
+  })();
+  const maxW=Math.max(...WEEK_DATA,1);
   const COLS=[T.green,T.blue,T.yellow,T.green,T.greenlt,T.purple,T.red];
 
   const advanceOrder = id => {
@@ -2240,11 +2344,28 @@ function Dashboard({nav, orders, setOrders, customers, services, bookings, setBo
 
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
 function Login({onLogin}) {
-  const [f,setF]=useState({e:"",p:""});
-  const [err,setErr]=useState("");
-  const go=()=>{
-    if(f.e==="mitchi@shop.vn"&&f.p==="mitchi2024") onLogin();
-    else setErr("Sai email hoặc mật khẩu!");
+  const [tab, setTab]   = useState("login");  // "login" | "signup"
+  const [f,   setF]     = useState({e:"",p:"",p2:""});
+  const [err, setErr]   = useState("");
+  const [load,setLoad]  = useState(false);
+
+  const go = async () => {
+    if(!f.e||!f.p){setErr("Điền đủ email và mật khẩu!"); return;}
+    if(tab==="signup"&&f.p!==f.p2){setErr("Mật khẩu không khớp!"); return;}
+    if(f.p.length<6){setErr("Mật khẩu tối thiểu 6 ký tự!"); return;}
+    setLoad(true); setErr("");
+    try {
+      const action = tab==="login" ? "token?grant_type=password" : "signup";
+      await sbAuth(action, f.e, f.p);
+      onLogin();
+    } catch(e) {
+      const msg = e.message||"";
+      if(msg.includes("Invalid login")) setErr("Sai email hoặc mật khẩu!");
+      else if(msg.includes("already registered")) setErr("Email đã được đăng ký! Hãy đăng nhập.");
+      else if(msg.includes("confirm")) setErr("✅ Đã gửi email xác nhận — kiểm tra hộp thư rồi đăng nhập!");
+      else setErr(msg||"Lỗi kết nối, thử lại!");
+    }
+    setLoad(false);
   };
   return(
     <div className="login-bg">
@@ -2263,14 +2384,14 @@ function Login({onLogin}) {
       </div>
       <div style={{background:T.card,border:`2.5px solid ${T.ink}`,borderRadius:20,padding:24,width:"100%",maxWidth:360,boxShadow:`5px 5px 0 ${T.ink}`,position:"relative",zIndex:1}}>
         <div className="f"><label style={{color:T.muted}}>Email</label>
-          <input type="email" placeholder="mitchi@shop.vn" value={f.e} onChange={e=>setF(p=>({...p,e:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&go()} style={{}}/>
+          <input type="email" placeholder="email@example.com" value={f.e} onChange={e=>setF(p=>({...p,e:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&go()} style={{}}/>
         </div>
         <div className="f"><label style={{color:T.muted}}>Mật khẩu</label>
           <input type="password" placeholder="••••••••" value={f.p} onChange={e=>setF(p=>({...p,p:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&go()} style={{}}/>
         </div>
         {err&&<div style={{color:"#FF6B6B",fontSize:13,fontWeight:600,marginBottom:10}}>⚠️ {err}</div>}
         <button className="btn btn-yellow" onClick={go}>Đăng nhập</button>
-        <div style={{fontSize:11,color:T.muted,textAlign:"center",marginTop:12,fontWeight:700}}>Demo: mitchi@shop.vn / mitchi2024</div>
+        
       </div>
     </div>
   );
@@ -2347,21 +2468,164 @@ export default function App() {
   const [shop,      setShop]      = useState(DEFAULT_SHOP);
   const [replies,   setReplies]   = useState(REPLIES);
   const [topics,    setTopics]    = useState(["Tình yêu","Hôn nhân / Ex","Sự nghiệp","Tài chính","Gia đình","Sức khỏe","Tổng quát"]);
+  const [dbReady,   setDbReady]   = useState(false);
+  const [syncing,   setSyncing]   = useState(false);
 
   const toast = msg => { setToast(msg); setTimeout(()=>setToast(""), 2500); };
   const nav   = id  => setPage(id);
 
-  // Centralized save — updates order AND customer.lastOrder
-  const saveOrder = o => {
+  // ── Load all data from Supabase on login ─────────────────────────────
+  const loadFromDb = async () => {
+    setSyncing(true);
+    try {
+      const [svcs, custs, ords, bks, reps, settings] = await Promise.all([
+        sb.getAll("services", "name.asc"),
+        sb.getAll("customers", "created_at.desc"),
+        sb.getAll("orders", "created_at.desc"),
+        sb.getAll("bookings", "date.asc,time.asc"),
+        sb.getAll("replies", "created_at.asc"),
+        sb.getAll("shop_settings"),
+      ]);
+      // Parse JSON fields from Supabase string columns
+      if (svcs.length)  setServices(svcs);
+      if (custs.length) setCustomers(custs);
+      if (ords.length)  setOrders(ords.map(o => ({
+        ...o,
+        items:  typeof o.items  === "string" ? JSON.parse(o.items  || "[]") : (o.items  || []),
+        extraQ: Number(o.extraQ || 0),
+        total:  Number(o.total  || 0),
+        tips:   Number(o.tips   || 0),
+      })));
+      if (bks.length)   setBookings(bks);
+      if (reps.length)  setReplies(reps.map(r => ({
+        ...r,
+        images: typeof r.images === "string" && r.images
+          ? (() => { try { return JSON.parse(r.images); } catch { return []; } })()
+          : (r.images || []),
+      })));
+      if (settings.length) {
+        const s = settings[0];
+        if (s.shop)   { try { setShop(JSON.parse(s.shop)); }   catch{} }
+        if (s.topics) { try { setTopics(JSON.parse(s.topics)); } catch{} }
+      }
+      setDbReady(true);
+    } catch(e) {
+      console.error("Load error:", e);
+      toast("⚠️ Không tải được data từ cloud — dùng data mẫu tạm thời");
+      setDbReady(true);
+    }
+    setSyncing(false);
+  };
+
+  useEffect(() => { if (auth) loadFromDb(); }, [auth]);
+
+  // ── Auto-sync helpers ─────────────────────────────────────────────────
+  const syncSettings = async (newShop, newTopics) => {
+    try {
+      await sb.upsert("shop_settings", {
+        id: "singleton",
+        shop: JSON.stringify(newShop),
+        topics: JSON.stringify(newTopics),
+        updated_at: new Date().toISOString(),
+      });
+    } catch(e) { console.error("Sync settings:", e); }
+  };
+
+  // Wrapped setters that also sync to Supabase
+  const setShopAndSync = async (updater) => {
+    setShop(prev => {
+      const next = typeof updater==="function" ? updater(prev) : updater;
+      syncSettings(next, topics).catch(console.error);
+      return next;
+    });
+  };
+
+  const setTopicsAndSync = async (updater) => {
+    setTopics(prev => {
+      const next = typeof updater==="function" ? updater(prev) : updater;
+      setShop(s => { syncSettings(s, next).catch(console.error); return s; });
+      return next;
+    });
+  };
+
+  const setServicesAndSync = (updater) => {
+    setServices(prev => {
+      const next = typeof updater==="function" ? updater(prev) : updater;
+      // Sync changed services
+      const prevIds = prev.map(s=>s.id);
+      const nextIds = next.map(s=>s.id);
+      // Upsert all
+      next.forEach(s => sb.upsert("services", s).catch(console.error));
+      // Delete removed
+      prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("services", id).catch(console.error));
+      return next;
+    });
+  };
+
+  const setCustomersAndSync = (updater) => {
+    setCustomers(prev => {
+      const next = typeof updater==="function" ? updater(prev) : updater;
+      const prevIds = prev.map(c=>c.id);
+      const nextIds = next.map(c=>c.id);
+      next.forEach(c => sb.upsert("customers", c).catch(console.error));
+      prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("customers", id).catch(console.error));
+      return next;
+    });
+  };
+
+  const setBookingsAndSync = (updater) => {
+    setBookings(prev => {
+      const next = typeof updater==="function" ? updater(prev) : updater;
+      const prevIds = prev.map(b=>b.id);
+      const nextIds = next.map(b=>b.id);
+      next.forEach(b => sb.upsert("bookings", b).catch(console.error));
+      prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("bookings", id).catch(console.error));
+      return next;
+    });
+  };
+
+  const setRepliesAndSync = (updater) => {
+    setReplies(prev => {
+      const next = typeof updater==="function" ? updater(prev) : updater;
+      const prevIds = prev.map(r=>r.id);
+      const nextIds = next.map(r=>r.id);
+      next.forEach(r => sb.upsert("replies", {...r, images: r.images ? JSON.stringify(r.images) : null}).catch(console.error));
+      prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("replies", id).catch(console.error));
+      return next;
+    });
+  };
+
+  // Centralized order save — updates local + Supabase + customer.lastOrder
+  const saveOrder = async (o) => {
     setOrders(p => {
       const exists = p.find(x=>x.id===o.id);
       return exists ? p.map(x=>x.id===o.id?o:x) : [o,...p];
     });
     setCustomers(p=>p.map(c=>c.id===o.custId?{...c,lastOrder:o.date}:c));
+    try {
+      await sb.upsert("orders", {
+        ...o,
+        items: JSON.stringify(o.items),
+      });
+      // Also update customer lastOrder in DB
+      await sb.update("customers", o.custId, { lastOrder: o.date });
+    } catch(e) { console.error("Save order:", e); }
+  };
+
+  const deleteOrder = async (id) => {
+    setOrders(p=>p.filter(o=>o.id!==id));
+    try { await sb.delete("orders", id); } catch(e) { console.error("Delete order:", e); }
   };
 
   const createOrderFor = custId => { setDefCustId(custId); setPage("orders"); };
   const clearDef = () => setDefCustId(null);
+
+  // Sync banner
+  const SyncBanner = () => syncing ? (
+    <div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:T.green,color:"#fff",textAlign:"center",fontSize:12,fontWeight:700,padding:"6px",zIndex:1000,fontFamily:"Nunito"}}>
+      ☁️ Đang đồng bộ dữ liệu...
+    </div>
+  ) : null;
 
   const pages = {
     dashboard: <Dashboard
@@ -2377,23 +2641,23 @@ export default function App() {
       topics={topics} setTopics={setTopics}
     />,
     customers: <CustomersPage
-      customers={customers} setCustomers={setCustomers}
+      customers={customers} setCustomers={setCustomersAndSync}
       orders={orders} services={services}
       toast={toast} onCreateOrder={createOrderFor}
     />,
     booking: <BookingPage
-      bookings={bookings} setBookings={setBookings}
+      bookings={bookings} setBookings={setBookingsAndSync}
       customers={customers} services={services}
       orders={orders} setOrders={setOrders} saveOrder={saveOrder}
       toast={toast}
     />,
-    messages: <MessagesPage toast={toast} replies={replies} setReplies={setReplies}/>,
+    messages: <MessagesPage toast={toast} replies={replies} setReplies={setRepliesAndSync}/>,
     report:   <ReportPage orders={orders} customers={customers} services={services}/>,
     settings: <SettingsPage
       logout={()=>setAuth(false)} toast={toast}
-      services={services} setServices={setServices}
-      shop={shop} setShop={setShop}
-      topics={topics} setTopics={setTopics}
+      services={services} setServices={setServicesAndSync}
+      shop={shop} setShop={setShopAndSync}
+      topics={topics} setTopics={setTopicsAndSync}
     />,
   };
 
@@ -2404,6 +2668,7 @@ export default function App() {
         <Login onLogin={()=>setAuth(true)}/>
       ) : (
         <div className="app">
+          <SyncBanner/>
           {toastMsg&&<div className="toast">{toastMsg}</div>}
           {pages[page]||pages.dashboard}
           <nav className="bnav">
