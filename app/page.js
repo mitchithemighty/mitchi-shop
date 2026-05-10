@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // ── DESIGN TOKENS ─────────────────────────────────────────────────────────────
 // ── CROC THEME — from gouache illustration ─────────────────────────────
@@ -37,8 +37,11 @@ const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&family=Nunito+Sans:wght@400;500;600;700&display=swap');
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:${T.bg};font-family:'Nunito Sans',sans-serif;color:${T.ink};-webkit-font-smoothing:antialiased;overscroll-behavior:none}
+body{background:${T.bg};font-family:'Nunito Sans',sans-serif;color:${T.ink};-webkit-font-smoothing:antialiased;overscroll-behavior:none;background-image:radial-gradient(circle at 20% 20%,rgba(91,200,245,.07) 0%,transparent 50%),radial-gradient(circle at 80% 80%,rgba(62,175,94,.06) 0%,transparent 50%)}
 .app{max-width:430px;margin:0 auto;min-height:100dvh;background:${T.bg};position:relative}
+.page-bg{position:relative}
+.page-bg::before{content:'';position:fixed;top:0;right:0;width:160px;height:160px;border-radius:0 0 0 160px;background:linear-gradient(135deg,rgba(91,200,245,.08),rgba(62,175,94,.06));pointer-events:none;z-index:0}
+.page-bg::after{content:'';position:fixed;bottom:100px;left:0;width:120px;height:120px;border-radius:0 120px 120px 0;background:linear-gradient(135deg,rgba(62,175,94,.06),rgba(91,200,245,.04));pointer-events:none;z-index:0}
 
 /* CARD — chunky outline style like illustration */
 .card{background:${T.card};border-radius:18px;border:2.5px solid ${T.ink};box-shadow:3px 3px 0 ${T.ink};padding:16px}
@@ -51,7 +54,7 @@ body{background:${T.bg};font-family:'Nunito Sans',sans-serif;color:${T.ink};-web
 
 /* HEADER — sky blue like illustration background */
 .hdr{background:${T.sky};padding:52px 20px 20px;position:relative;overflow:hidden;border-bottom:3px solid ${T.ink}}
-.hdr::before{content:'🐸';position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:52px;opacity:.15;pointer-events:none}
+.hdr::before{content:'✦';position:absolute;right:20px;top:14px;font-size:28px;color:rgba(255,255,255,.15);pointer-events:none}.hdr::after{content:'✦';position:absolute;left:20px;bottom:14px;font-size:16px;color:rgba(255,255,255,.1);pointer-events:none}
 .hdr-eye{font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:${T.ink};opacity:.6;margin-bottom:4px}
 .hdr-h1{font-family:'Nunito',sans-serif;font-size:26px;font-weight:900;color:${T.ink};line-height:1.1}
 .hdr-sub{font-size:12px;font-weight:700;color:${T.ink};opacity:.6;margin-top:5px}
@@ -123,7 +126,8 @@ body{background:${T.bg};font-family:'Nunito Sans',sans-serif;color:${T.ink};-web
 .tg-tip{background:${T.purplebg};color:${T.purple}}
 
 /* ROW */
-.row{background:${T.card};border-radius:15px;border:2px solid ${T.ink};box-shadow:3px 3px 0 ${T.ink};padding:13px 14px;display:flex;align-items:center;gap:12px;margin-bottom:9px;cursor:pointer;transition:transform .1s,box-shadow .1s}
+.row{background:${T.card};border-radius:15px;border:2px solid ${T.ink};box-shadow:3px 3px 0 ${T.ink};padding:13px 14px;display:flex;align-items:center;gap:12px;margin-bottom:9px;cursor:pointer;transition:transform .1s,box-shadow .1s,background .1s}
+.row:hover{background:#F8FFF9}
 .row:active{transform:translate(2px,2px);box-shadow:1px 1px 0 ${T.ink}}
 .ava{width:40px;height:40px;border-radius:12px;border:2px solid ${T.ink};box-shadow:2px 2px 0 ${T.ink};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;background:${T.bg}}
 
@@ -205,8 +209,9 @@ body{background:${T.bg};font-family:'Nunito Sans',sans-serif;color:${T.ink};-web
 .empty-sub{font-size:13px;color:${T.muted};font-weight:600}
 
 /* LOGIN */
-.login-bg{min-height:100dvh;background:${T.sky};display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;position:relative;overflow:hidden}
-.login-bg::before{content:'🐸';position:absolute;font-size:280px;opacity:.06;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
+.login-bg{min-height:100dvh;background:linear-gradient(160deg,${T.sky} 0%,#8DDAF8 50%,${T.greenbg} 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;position:relative;overflow:hidden}
+.login-bg::before{content:'';position:absolute;width:300px;height:300px;border-radius:50%;background:rgba(255,255,255,.12);top:-80px;right:-80px;pointer-events:none}
+.login-bg::after{content:'';position:absolute;width:200px;height:200px;border-radius:50%;background:rgba(62,175,94,.15);bottom:-60px;left:-60px;pointer-events:none}
 
 /* MISC */
 .scroll-body{padding-bottom:100px}
@@ -477,7 +482,7 @@ function InvoiceView({order, cust, services, toast, onClose, shop}) {
         <DragHandle/>
         <div style={{fontFamily:"Nunito",fontSize:18,fontWeight:900,color:"#fff",marginBottom:16}}>🧾 Hóa Đơn</div>
 
-        <div className="inv-wrap">
+        <div className="inv-wrap" id="inv-print-area">
           <div style={{height:5,background:`repeating-linear-gradient(90deg,${T.gold} 0,${T.gold} 4px,transparent 4px,transparent 10px)`,opacity:.6}}/>
           <div style={{padding:"18px 18px 14px",textAlign:"center",position:"relative"}}>
             <div style={{position:"absolute",top:10,left:12,color:T.gold,opacity:.6,fontSize:16}}>✦</div>
@@ -544,7 +549,23 @@ function InvoiceView({order, cust, services, toast, onClose, shop}) {
             </button>
           ))}
         </div>
-        <button className="btn btn-yellow" style={{marginBottom:8}} onClick={copyText}>📋 Copy text gửi Zalo/Messenger</button>
+        <div style={{display:"flex",gap:8,marginBottom:8}}>
+          <button className="btn btn-red" style={{flex:1}} onClick={async()=>{
+            const el = document.getElementById("inv-print-area");
+            if(!el){toast("⚠️ Không tìm thấy hóa đơn!");return;}
+            if(!window.html2canvas){toast("⏳ Đang tải thư viện, thử lại sau 2 giây...");return;}
+            toast("📸 Đang xuất PNG...");
+            try{
+              const canvas = await window.html2canvas(el,{scale:2,useCORS:true,backgroundColor:null,logging:false});
+              const link = document.createElement("a");
+              link.download = `hoadon-${cust?.name||"khach"}-${order.date.replace(/\//g,"-")}.png`;
+              link.href = canvas.toDataURL("image/png");
+              link.click();
+              toast("✅ Đã tải hóa đơn PNG!");
+            }catch(e){toast("❌ Lỗi xuất PNG: "+e.message);}
+          }}>📸 Xuất PNG</button>
+          <button className="btn btn-yellow" style={{flex:1}} onClick={copyText}>📋 Copy text</button>
+        </div>
         <button className="btn btn-ghost" style={{color:"rgba(255,255,255,.5)",border:"1px solid rgba(255,255,255,.15)"}} onClick={onClose}>Đóng</button>
       </div>
     </div>
@@ -1872,7 +1893,7 @@ function SettingsPage({logout, toast, services, setServices, shop, setShop}) {
           {ico:"💳",t:"Tài khoản ngân hàng",s:`ACB ${shop.acbNo||"—"}${shop.vcbNo?" · VCB "+shop.vcbNo:""}`,       fn:()=>setSection("bank")},
           {ico:"🔔",t:"Thông báo",          s:"Nhắc booking, chưa TT, follow-up",                                  fn:()=>setSection("notif")},
           {ico:"📱",t:"Cài như app (PWA)",  s:"Thêm vào màn hình chính điện thoại",                                fn:()=>setSection("pwa")},
-          {ico:"☁️",t:"Sao lưu & đồng bộ", s:"Cần setup Supabase để lưu data thật",                              fn:()=>toast("☁️ Xem hướng dẫn README để setup Supabase!")},
+          {ico:"☁️",t:"Sao lưu & đồng bộ", s:"Cần setup Supabase để lưu data thật",                              fn:()=>window.open('https://supabase.com/dashboard','_blank')},
         ].map(x=>(
           <div key={x.t} className="row" onClick={x.fn}>
             <div style={{fontSize:22,width:36,textAlign:"center",flexShrink:0}}>{x.ico}</div>
@@ -2129,12 +2150,20 @@ function Login({onLogin}) {
   };
   return(
     <div className="login-bg">
-      <div style={{textAlign:"center",marginBottom:32}}>
-        <div style={{fontSize:72,marginBottom:4}}>🐸</div>
-        <div style={{fontFamily:"Nunito",fontSize:40,fontWeight:900,color:T.ink,letterSpacing:-1}}>Mitchi</div>
-        <div style={{fontSize:13,fontWeight:800,color:T.ink,opacity:.6,marginTop:4,letterSpacing:.5}}>Shop Manager · Tarot & Lenormand</div>
+      {/* Cloud decorations */}
+      <div style={{position:"absolute",top:40,left:-30,width:150,height:65,background:"rgba(255,255,255,.5)",borderRadius:50,border:`2px solid ${T.ink}`,zIndex:0}}/>
+      <div style={{position:"absolute",top:20,left:60,width:100,height:45,background:"rgba(255,255,255,.4)",borderRadius:40,border:`2px solid ${T.ink}`,zIndex:0}}/>
+      <div style={{position:"absolute",top:55,right:-20,width:130,height:55,background:"rgba(255,255,255,.45)",borderRadius:45,border:`2px solid ${T.ink}`,zIndex:0}}/>
+      <div style={{position:"absolute",bottom:80,left:-40,width:180,height:70,background:"rgba(255,255,255,.3)",borderRadius:50,border:`2px solid ${T.ink}`,zIndex:0}}/>
+      <div style={{position:"absolute",bottom:120,right:-30,width:120,height:50,background:"rgba(255,255,255,.35)",borderRadius:40,border:`2px solid ${T.ink}`,zIndex:0}}/>
+      <div style={{position:"relative",zIndex:1,textAlign:"center",marginBottom:32}}>
+        <div style={{width:90,height:90,borderRadius:22,border:`3px solid ${T.ink}`,boxShadow:`5px 5px 0 ${T.ink}`,background:T.card,margin:"0 auto 14px",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <img src="/images/logo.jpg" alt="Logo" style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";e.target.parentNode.innerHTML="<div style='font-size:44px'>🐸</div>";}}/>
+        </div>
+        <div style={{fontFamily:"Nunito",fontSize:38,fontWeight:900,color:T.ink,letterSpacing:-1}}>Mitchi</div>
+        <div style={{fontSize:13,fontWeight:800,color:T.ink,opacity:.65,marginTop:4,letterSpacing:.5}}>Shop Manager · Tarot & Lenormand</div>
       </div>
-      <div style={{background:T.card,border:`2.5px solid ${T.ink}`,borderRadius:20,padding:24,width:"100%",maxWidth:360,boxShadow:`5px 5px 0 ${T.ink}`}}>
+      <div style={{background:T.card,border:`2.5px solid ${T.ink}`,borderRadius:20,padding:24,width:"100%",maxWidth:360,boxShadow:`5px 5px 0 ${T.ink}`,position:"relative",zIndex:1}}>
         <div className="f"><label style={{color:T.muted}}>Email</label>
           <input type="email" placeholder="mitchi@shop.vn" value={f.e} onChange={e=>setF(p=>({...p,e:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&go()} style={{}}/>
         </div>
@@ -2176,6 +2205,14 @@ const DEFAULT_SHOP = {
   notifBooking:  true,
   notifFollowup: true,
 };
+
+// Load html2canvas for PNG export
+if (typeof window !== "undefined" && !window.html2canvas) {
+  const s = document.createElement("script");
+  s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+  s.async = true;
+  document.head.appendChild(s);
+}
 
 export default function App() {
   const [auth,      setAuth]      = useState(false);
