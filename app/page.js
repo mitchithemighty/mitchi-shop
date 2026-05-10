@@ -51,7 +51,7 @@ body{background:${T.bg};font-family:'Nunito Sans',sans-serif;color:${T.ink};-web
 
 /* HEADER — sky blue like illustration background */
 .hdr{background:${T.sky};padding:52px 20px 20px;position:relative;overflow:hidden;border-bottom:3px solid ${T.ink}}
-.hdr::before{content:'🐊';position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:52px;opacity:.15;pointer-events:none}
+.hdr::before{content:'🐸';position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:52px;opacity:.15;pointer-events:none}
 .hdr-eye{font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:${T.ink};opacity:.6;margin-bottom:4px}
 .hdr-h1{font-family:'Nunito',sans-serif;font-size:26px;font-weight:900;color:${T.ink};line-height:1.1}
 .hdr-sub{font-size:12px;font-weight:700;color:${T.ink};opacity:.6;margin-top:5px}
@@ -206,7 +206,7 @@ body{background:${T.bg};font-family:'Nunito Sans',sans-serif;color:${T.ink};-web
 
 /* LOGIN */
 .login-bg{min-height:100dvh;background:${T.sky};display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;position:relative;overflow:hidden}
-.login-bg::before{content:'🐊';position:absolute;font-size:280px;opacity:.06;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
+.login-bg::before{content:'🐸';position:absolute;font-size:280px;opacity:.06;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
 
 /* MISC */
 .scroll-body{padding-bottom:100px}
@@ -1727,101 +1727,96 @@ function ServiceManager({services, setServices, toast}) {
 }
 
 
-// ── SETTINGS PAGE — all sections functional ───────────────────────────────────
-function SettingsPage({logout, toast, services, setServices, shop, setShop}) {
-  const [section, setSection] = useState(null); // null | "shop" | "bank" | "notif" | "pwa"
 
-  // ── Shop Info Form ──
-  const ShopForm = () => {
-    const [f,setF] = useState({name:shop.name,tagline:shop.tagline,phone:shop.phone||"",fb:shop.fb||"",footer:shop.footer||""});
-    return(
-      <div className="overlay" onClick={e=>e.target===e.currentTarget&&setSection(null)}>
-        <div className="sheet">
-          <DragHandle/>
-          <div className="sheet-title">🏪 Thông tin shop</div>
-          <div className="f"><label>Tên shop</label><input value={f.name} onChange={e=>setF(p=>({...p,name:e.target.value}))} placeholder="Mitchi The Mighty"/></div>
-          <div className="f"><label>Tagline / Mô tả ngắn</label><input value={f.tagline} onChange={e=>setF(p=>({...p,tagline:e.target.value}))} placeholder="Tarot and Lenormand Reader"/></div>
-          <div className="f"><label>Số điện thoại</label><input type="tel" value={f.phone} onChange={e=>setF(p=>({...p,phone:e.target.value}))} placeholder="0912345678"/></div>
-          <div className="f"><label>Facebook / Zalo / Instagram</label><input value={f.fb} onChange={e=>setF(p=>({...p,fb:e.target.value}))} placeholder="Link hoặc tên trang"/></div>
-          <div className="f"><label>Lời cảm ơn cuối hóa đơn</label><input value={f.footer} onChange={e=>setF(p=>({...p,footer:e.target.value}))} placeholder="Xin cảm ơn quý khách — Hẹn gặp lại!"/></div>
-          <div style={{display:"flex",gap:8}}>
-            <button className="btn btn-primary" style={{flex:2}} onClick={()=>{setShop(p=>({...p,...f}));setSection(null);toast("✅ Đã lưu thông tin shop!");}}>Lưu</button>
-            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setSection(null)}>Huỷ</button>
-          </div>
+// ── SETTINGS SUB-COMPONENTS (extracted to avoid hooks-in-inner-component crash) ───
+function ShopForm({shop, setShop, toast, onClose}) {
+  const [f,setF] = useState({name:shop.name||"",tagline:shop.tagline||"",phone:shop.phone||"",fb:shop.fb||"",footer:shop.footer||""});
+  return(
+    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="sheet">
+        <DragHandle/>
+        <div className="sheet-title">🏪 Thông tin shop</div>
+        <div className="f"><label>Tên shop</label><input value={f.name} onChange={e=>setF(p=>({...p,name:e.target.value}))} placeholder="Mitchi The Mighty"/></div>
+        <div className="f"><label>Tagline / Mô tả ngắn</label><input value={f.tagline} onChange={e=>setF(p=>({...p,tagline:e.target.value}))} placeholder="Tarot and Lenormand Reader"/></div>
+        <div className="f"><label>Số điện thoại</label><input type="tel" value={f.phone} onChange={e=>setF(p=>({...p,phone:e.target.value}))} placeholder="0912345678"/></div>
+        <div className="f"><label>Facebook / Zalo / Instagram</label><input value={f.fb} onChange={e=>setF(p=>({...p,fb:e.target.value}))} placeholder="Link hoặc tên trang"/></div>
+        <div className="f"><label>Lời cảm ơn cuối hóa đơn</label><input value={f.footer} onChange={e=>setF(p=>({...p,footer:e.target.value}))} placeholder="Xin cảm ơn quý khách — Hẹn gặp lại!"/></div>
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn btn-primary" style={{flex:2}} onClick={()=>{setShop(p=>({...p,...f}));onClose();toast("✅ Đã lưu thông tin shop!");}}>Lưu</button>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Huỷ</button>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+}
 
-  // ── Bank Form ──
-  const BankForm = () => {
-    const [f,setF] = useState({acbNo:shop.acbNo||"",acbName:shop.acbName||"",vcbNo:shop.vcbNo||"",vcbName:shop.vcbName||"",defaultQr:shop.defaultQr||"acb"});
-    return(
-      <div className="overlay" onClick={e=>e.target===e.currentTarget&&setSection(null)}>
-        <div className="sheet">
-          <DragHandle/>
-          <div className="sheet-title">💳 Tài khoản ngân hàng</div>
-          <div style={{fontFamily:"Nunito",fontWeight:700,fontSize:11,color:T.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>ACB</div>
-          <div className="f"><label>Số tài khoản ACB</label><input value={f.acbNo} onChange={e=>setF(p=>({...p,acbNo:e.target.value}))} placeholder="6205237"/></div>
-          <div className="f"><label>Tên chủ tài khoản ACB</label><input value={f.acbName} onChange={e=>setF(p=>({...p,acbName:e.target.value}))} placeholder="TON NU HONG CHAU"/></div>
-          <div style={{fontFamily:"Nunito",fontWeight:700,fontSize:11,color:T.muted,textTransform:"uppercase",letterSpacing:1,margin:"12px 0 8px"}}>Vietcombank</div>
-          <div className="f"><label>Số tài khoản VCB</label><input value={f.vcbNo} onChange={e=>setF(p=>({...p,vcbNo:e.target.value}))} placeholder="Để trống nếu không dùng"/></div>
-          <div className="f"><label>Tên chủ tài khoản VCB</label><input value={f.vcbName} onChange={e=>setF(p=>({...p,vcbName:e.target.value}))} placeholder="TON NU HONG CHAU"/></div>
-          <div className="f">
-            <label>Ngân hàng mặc định trên hóa đơn</label>
-            <div style={{display:"flex",gap:8}}>
-              {["acb","vcb"].map(b=>(
-                <button key={b} onClick={()=>setF(p=>({...p,defaultQr:b}))}
-                  style={{flex:1,padding:11,borderRadius:12,border:`1.5px solid ${f.defaultQr===b?T.ink:T.border2}`,background:f.defaultQr===b?T.ink:"transparent",fontFamily:"Nunito",fontWeight:700,fontSize:13,cursor:"pointer",color:f.defaultQr===b?"#fff":T.muted}}>
-                  🏦 {b==="acb"?"ACB":"VCB"}
-                </button>
-              ))}
-            </div>
-          </div>
+function BankForm({shop, setShop, toast, onClose}) {
+  const [f,setF] = useState({acbNo:shop.acbNo||"",acbName:shop.acbName||"",vcbNo:shop.vcbNo||"",vcbName:shop.vcbName||"",defaultQr:shop.defaultQr||"acb"});
+  return(
+    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="sheet">
+        <DragHandle/>
+        <div className="sheet-title">💳 Tài khoản ngân hàng</div>
+        <div style={{fontFamily:"Nunito",fontWeight:700,fontSize:11,color:T.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>ACB</div>
+        <div className="f"><label>Số tài khoản ACB</label><input value={f.acbNo} onChange={e=>setF(p=>({...p,acbNo:e.target.value}))} placeholder="6205237"/></div>
+        <div className="f"><label>Tên chủ tài khoản ACB</label><input value={f.acbName} onChange={e=>setF(p=>({...p,acbName:e.target.value}))} placeholder="TON NU HONG CHAU"/></div>
+        <div style={{fontFamily:"Nunito",fontWeight:700,fontSize:11,color:T.muted,textTransform:"uppercase",letterSpacing:1,margin:"12px 0 8px"}}>Vietcombank</div>
+        <div className="f"><label>Số tài khoản VCB</label><input value={f.vcbNo} onChange={e=>setF(p=>({...p,vcbNo:e.target.value}))} placeholder="Để trống nếu không dùng"/></div>
+        <div className="f"><label>Tên chủ tài khoản VCB</label><input value={f.vcbName} onChange={e=>setF(p=>({...p,vcbName:e.target.value}))} placeholder="TON NU HONG CHAU"/></div>
+        <div className="f">
+          <label>Ngân hàng mặc định trên hóa đơn</label>
           <div style={{display:"flex",gap:8}}>
-            <button className="btn btn-primary" style={{flex:2}} onClick={()=>{setShop(p=>({...p,...f}));setSection(null);toast("✅ Đã lưu tài khoản ngân hàng!");}}>Lưu</button>
-            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setSection(null)}>Huỷ</button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ── Notifications ──
-  const NotifForm = () => {
-    const [f,setF]=useState({unpaid:shop.notifUnpaid??true,booking:shop.notifBooking??true,followup:shop.notifFollowup??true});
-    return(
-      <div className="overlay" onClick={e=>e.target===e.currentTarget&&setSection(null)}>
-        <div className="sheet">
-          <DragHandle/>
-          <div className="sheet-title">🔔 Thông báo</div>
-          <div className="card" style={{marginBottom:12}}>
-            {[
-              {k:"unpaid",l:"Nhắc đơn chưa thanh toán",s:"Hiện cảnh báo trên Dashboard"},
-              {k:"booking",l:"Nhắc booking sắp tới",s:"Hiện trong Today Operations"},
-              {k:"followup",l:"Nhắc khách lâu chưa quay lại",s:"Sau 21 ngày không có đơn"},
-            ].map((x,i)=>(
-              <div key={x.k} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderBottom:i<2?`1px dashed ${T.border}`:"none"}}>
-                <div>
-                  <div style={{fontSize:14,fontWeight:700}}>{x.l}</div>
-                  <div style={{fontSize:11,color:T.muted,marginTop:2}}>{x.s}</div>
-                </div>
-                <button className={`tog ${f[x.k]?"on":"off"}`} onClick={()=>setF(p=>({...p,[x.k]:!p[x.k]}))}/>
-              </div>
+            {["acb","vcb"].map(b=>(
+              <button key={b} onClick={()=>setF(p=>({...p,defaultQr:b}))}
+                style={{flex:1,padding:11,borderRadius:12,border:`2px solid ${f.defaultQr===b?T.ink:T.border2}`,background:f.defaultQr===b?T.ink:"transparent",fontFamily:"Nunito",fontWeight:700,fontSize:13,cursor:"pointer",color:f.defaultQr===b?"#fff":T.muted}}>
+                🏦 {b==="acb"?"ACB":"VCB"}
+              </button>
             ))}
           </div>
-          <div style={{display:"flex",gap:8}}>
-            <button className="btn btn-primary" style={{flex:2}} onClick={()=>{setShop(p=>({...p,notifUnpaid:f.unpaid,notifBooking:f.booking,notifFollowup:f.followup}));setSection(null);toast("✅ Đã lưu cài đặt thông báo!");}}>Lưu</button>
-            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setSection(null)}>Huỷ</button>
-          </div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn btn-primary" style={{flex:2}} onClick={()=>{setShop(p=>({...p,...f}));onClose();toast("✅ Đã lưu tài khoản ngân hàng!");}}>Lưu</button>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Huỷ</button>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+}
 
-  // ── PWA Install ──
-  const PwaInfo = () => (
-    <div className="overlay" onClick={e=>e.target===e.currentTarget&&setSection(null)}>
+function NotifForm({shop, setShop, toast, onClose}) {
+  const [f,setF] = useState({unpaid:shop.notifUnpaid??true,booking:shop.notifBooking??true,followup:shop.notifFollowup??true});
+  return(
+    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="sheet">
+        <DragHandle/>
+        <div className="sheet-title">🔔 Thông báo</div>
+        <div className="card" style={{marginBottom:12}}>
+          {[
+            {k:"unpaid",  l:"Nhắc đơn chưa thanh toán",    s:"Hiện cảnh báo trên Dashboard"},
+            {k:"booking", l:"Nhắc booking sắp tới",         s:"Hiện trong Today Operations"},
+            {k:"followup",l:"Nhắc khách lâu chưa quay lại", s:"Sau 21 ngày không có đơn"},
+          ].map((x,i)=>(
+            <div key={x.k} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderBottom:i<2?`1px dashed ${T.border}`:"none"}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:700}}>{x.l}</div>
+                <div style={{fontSize:11,color:T.muted,marginTop:2}}>{x.s}</div>
+              </div>
+              <button className={`tog ${f[x.k]?"on":"off"}`} onClick={()=>setF(p=>({...p,[x.k]:!p[x.k]}))}/>
+            </div>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button className="btn btn-primary" style={{flex:2}} onClick={()=>{setShop(p=>({...p,notifUnpaid:f.unpaid,notifBooking:f.booking,notifFollowup:f.followup}));onClose();toast("✅ Đã lưu cài đặt thông báo!");}}>Lưu</button>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Huỷ</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PwaInfo({onClose}) {
+  return(
+    <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="sheet">
         <DragHandle/>
         <div className="sheet-title">📱 Cài như app (PWA)</div>
@@ -1829,7 +1824,6 @@ function SettingsPage({logout, toast, services, setServices, shop, setShop}) {
           <div style={{fontWeight:700,marginBottom:6}}>✅ App đã sẵn sàng cài!</div>
           <div style={{fontSize:13,color:T.muted,lineHeight:1.6}}>Link: <strong>mitchi-shop.vercel.app</strong></div>
         </div>
-        <div style={{fontSize:14,fontWeight:700,marginBottom:12}}>Hướng dẫn theo thiết bị:</div>
         {[
           {ico:"🍎",title:"iPhone / iPad (Safari)",steps:["Mở Safari → vào link app","Nhấn nút chia sẻ ⬆️ ở dưới","Chọn 'Thêm vào màn hình chính'","Nhấn 'Thêm' — xong! 🎉"]},
           {ico:"🤖",title:"Android (Chrome)",steps:["Mở Chrome → vào link app","Nhấn menu ⋮ góc trên phải","Chọn 'Thêm vào màn hình chính'","Nhấn 'Thêm' — xong! 🎉"]},
@@ -1844,10 +1838,15 @@ function SettingsPage({logout, toast, services, setServices, shop, setShop}) {
             ))}
           </div>
         ))}
-        <button className="btn btn-ghost" onClick={()=>setSection(null)}>Đóng</button>
+        <button className="btn btn-ghost" onClick={onClose}>Đóng</button>
       </div>
     </div>
   );
+}
+
+// ── SETTINGS PAGE ─────────────────────────────────────────────────────────────
+function SettingsPage({logout, toast, services, setServices, shop, setShop}) {
+  const [section, setSection] = useState(null);
 
   return(
     <div className="scroll-body">
@@ -1856,7 +1855,6 @@ function SettingsPage({logout, toast, services, setServices, shop, setShop}) {
         <div className="hdr-h1">Cài Đặt</div>
       </div>
       <div className="sec">
-        {/* Shop preview */}
         <div className="card card-green" style={{marginBottom:16,display:"flex",alignItems:"center",gap:14}}>
           <img src="/images/logo.jpg" alt="Logo" style={{width:52,height:52,objectFit:"contain",borderRadius:10,flexShrink:0}} onError={e=>{e.target.style.display="none";}}/>
           <div>
@@ -1870,11 +1868,11 @@ function SettingsPage({logout, toast, services, setServices, shop, setShop}) {
         <div style={{fontFamily:"Nunito",fontWeight:700,fontSize:11,color:T.muted,textTransform:"uppercase",letterSpacing:1,margin:"20px 0 10px"}}>Shop & Tài Khoản</div>
 
         {[
-          {ico:"🏪",t:"Thông tin shop",     s:`${shop.name} · ${shop.tagline}`,                          fn:()=>setSection("shop")},
-          {ico:"💳",t:"Tài khoản ngân hàng",s:`ACB ${shop.acbNo||"—"} · ${shop.vcbNo?"VCB "+shop.vcbNo:""}`,fn:()=>setSection("bank")},
-          {ico:"🔔",t:"Thông báo",          s:"Nhắc booking, chưa TT, follow-up",                        fn:()=>setSection("notif")},
-          {ico:"📱",t:"Cài như app (PWA)",  s:"Thêm vào màn hình chính điện thoại",                      fn:()=>setSection("pwa")},
-          {ico:"☁️",t:"Sao lưu & đồng bộ", s:"Cần setup Supabase — xem hướng dẫn",                     fn:()=>toast("☁️ Xem hướng dẫn setup Supabase trong README!")},
+          {ico:"🏪",t:"Thông tin shop",     s:`${shop.name} · ${shop.tagline}`,                                     fn:()=>setSection("shop")},
+          {ico:"💳",t:"Tài khoản ngân hàng",s:`ACB ${shop.acbNo||"—"}${shop.vcbNo?" · VCB "+shop.vcbNo:""}`,       fn:()=>setSection("bank")},
+          {ico:"🔔",t:"Thông báo",          s:"Nhắc booking, chưa TT, follow-up",                                  fn:()=>setSection("notif")},
+          {ico:"📱",t:"Cài như app (PWA)",  s:"Thêm vào màn hình chính điện thoại",                                fn:()=>setSection("pwa")},
+          {ico:"☁️",t:"Sao lưu & đồng bộ", s:"Cần setup Supabase để lưu data thật",                              fn:()=>toast("☁️ Xem hướng dẫn README để setup Supabase!")},
         ].map(x=>(
           <div key={x.t} className="row" onClick={x.fn}>
             <div style={{fontSize:22,width:36,textAlign:"center",flexShrink:0}}>{x.ico}</div>
@@ -1890,13 +1888,14 @@ function SettingsPage({logout, toast, services, setServices, shop, setShop}) {
         <button className="btn btn-ghost" style={{color:T.red,borderColor:T.red}} onClick={logout}>Đăng xuất</button>
       </div>
 
-      {section==="shop"  && <ShopForm/>}
-      {section==="bank"  && <BankForm/>}
-      {section==="notif" && <NotifForm/>}
-      {section==="pwa"   && <PwaInfo/>}
+      {section==="shop"  && <ShopForm  shop={shop} setShop={setShop} toast={toast} onClose={()=>setSection(null)}/>}
+      {section==="bank"  && <BankForm  shop={shop} setShop={setShop} toast={toast} onClose={()=>setSection(null)}/>}
+      {section==="notif" && <NotifForm shop={shop} setShop={setShop} toast={toast} onClose={()=>setSection(null)}/>}
+      {section==="pwa"   && <PwaInfo   onClose={()=>setSection(null)}/>}
     </div>
   );
 }
+
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function Dashboard({nav, orders, setOrders, customers, services, bookings, setBookings, toast, shop}) {
@@ -2131,7 +2130,7 @@ function Login({onLogin}) {
   return(
     <div className="login-bg">
       <div style={{textAlign:"center",marginBottom:32}}>
-        <div style={{fontSize:72,marginBottom:4}}>🐊</div>
+        <div style={{fontSize:72,marginBottom:4}}>🐸</div>
         <div style={{fontFamily:"Nunito",fontSize:40,fontWeight:900,color:T.ink,letterSpacing:-1}}>Mitchi</div>
         <div style={{fontSize:13,fontWeight:800,color:T.ink,opacity:.6,marginTop:4,letterSpacing:.5}}>Shop Manager · Tarot & Lenormand</div>
       </div>
