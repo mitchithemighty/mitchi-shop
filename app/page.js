@@ -114,7 +114,7 @@ const CSS = `
 body{background:${T.bg};font-family:'Nunito Sans',sans-serif;color:${T.ink};-webkit-font-smoothing:antialiased;overscroll-behavior:none;background-image:radial-gradient(circle at 20% 20%,rgba(91,200,245,.07) 0%,transparent 50%),radial-gradient(circle at 80% 80%,rgba(62,175,94,.06) 0%,transparent 50%)}
 .app{max-width:430px;margin:0 auto;min-height:100dvh;background:${T.bg};position:relative}
 .page-bg{position:relative}
-.page-bg::before{content:'';position:fixed;top:0;right:0;width:160px;height:160px;border-radius:0 0 0 160px;background:linear-gradient(135deg,rgba(91,200,245,.08),rgba(62,175,94,.06));pointer-events:none;z-index:0}
+.page-bg::before{content:'🐸';position:fixed;top:12px;right:12px;font-size:28px;opacity:.08;pointer-events:none;z-index:0}
 .page-bg::after{content:'';position:fixed;bottom:100px;left:0;width:120px;height:120px;border-radius:0 120px 120px 0;background:linear-gradient(135deg,rgba(62,175,94,.06),rgba(91,200,245,.04));pointer-events:none;z-index:0}
 
 /* CARD — chunky outline style like illustration */
@@ -128,7 +128,7 @@ body{background:${T.bg};font-family:'Nunito Sans',sans-serif;color:${T.ink};-web
 
 /* HEADER — sky blue like illustration background */
 .hdr{background:${T.sky};padding:52px 20px 20px;position:relative;overflow:hidden;border-bottom:3px solid ${T.ink}}
-.hdr::before{content:'✦';position:absolute;right:20px;top:14px;font-size:28px;color:rgba(255,255,255,.15);pointer-events:none}.hdr::after{content:'✦';position:absolute;left:20px;bottom:14px;font-size:16px;color:rgba(255,255,255,.1);pointer-events:none}
+.hdr::before{content:'🐸';position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:44px;opacity:.12;pointer-events:none}.hdr::after{content:'✦';position:absolute;left:20px;bottom:14px;font-size:16px;color:rgba(255,255,255,.15);pointer-events:none}
 .hdr-eye{font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:${T.ink};opacity:.6;margin-bottom:4px}
 .hdr-h1{font-family:'Nunito',sans-serif;font-size:26px;font-weight:900;color:${T.ink};line-height:1.1}
 .hdr-sub{font-size:12px;font-weight:700;color:${T.ink};opacity:.6;margin-top:5px}
@@ -284,7 +284,7 @@ body{background:${T.bg};font-family:'Nunito Sans',sans-serif;color:${T.ink};-web
 
 /* LOGIN */
 .login-bg{min-height:100dvh;background:linear-gradient(160deg,${T.sky} 0%,#8DDAF8 50%,${T.greenbg} 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;position:relative;overflow:hidden}
-.login-bg::before{content:'';position:absolute;width:300px;height:300px;border-radius:50%;background:rgba(255,255,255,.12);top:-80px;right:-80px;pointer-events:none}
+.login-bg::before{content:'🐸';position:absolute;font-size:260px;opacity:.07;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;line-height:1}
 .login-bg::after{content:'';position:absolute;width:200px;height:200px;border-radius:50%;background:rgba(62,175,94,.15);bottom:-60px;left:-60px;pointer-events:none}
 
 /* MISC */
@@ -822,7 +822,7 @@ function OrdersPage({orders, setOrders, saveOrder, customers, services, toast, d
     return true;
   });
 
-  const saveNew = o => { saveOrder(o); setShowNew(false); clearDefaultCust(); toast("✅ Đã tạo đơn!"); };
+  const saveNew = o => { saveOrder(o); setShowNew(false); clearDefaultCust(); toast("✅ Đã tạo đơn! 🐸"); };
   const upd = o => saveOrder(o);
   const selOrder = orders.find(o=>o.id===selId);
   const cName = id => customers.find(c=>c.id===id)?.name||"?";
@@ -846,7 +846,7 @@ function OrdersPage({orders, setOrders, saveOrder, customers, services, toast, d
           ))}
         </div>
 
-        {shown.length===0&&<EmptyState ico="📋" title="Không có đơn nào" sub="Nhấn + để tạo đơn mới"/>}
+        {shown.length===0&&<EmptyState ico="🐸" title="Chưa có đơn nào" sub="Nhấn + để tạo đơn đầu tiên!"/>}
 
         {shown.map(o=>(
           <div key={o.id} className="row" onClick={()=>setSelId(o.id)} style={{borderLeft:`3px solid ${o.status==="paid"?T.green:o.status==="cancel"?T.red:o.status==="done"?T.yellow:o.status==="view"?T.purple:T.blue}`}}>
@@ -917,7 +917,7 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
     } else {
       const nc={id:uid(),...form,tags:["new"],created:todayStr(),lastOrder:""};
       setCustomers(p=>[nc,...p]);
-      toast("✅ Đã thêm khách mới!");
+      toast("✅ Đã thêm khách mới! 🐸");
     }
     setModal(false);
   };
@@ -1062,7 +1062,7 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
           </div>
         )}
 
-        {filtered.length===0&&<EmptyState ico="👥" title="Không có khách nào" sub="Nhấn + để thêm khách mới"/>}
+        {filtered.length===0&&<EmptyState ico="🐸" title="Chưa có khách nào" sub="Nhấn + để thêm khách đầu tiên!"/>}
 
         {filtered.map(c=>{
           const ts=totalSpent(c.id); const tt=totalTips(c.id); const tags=autoTags(c); const fu=needsFollowUp(c);
@@ -1190,7 +1190,7 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
           <button className={`pill ${tab==="upcoming"?"on":""}`} onClick={()=>setTab("upcoming")}>Sắp tới ({upcomBks.length})</button>
         </div>
 
-        {shown.length===0&&<EmptyState ico="📅" title={tab==="today"?"Hôm nay không có lịch":"Không có lịch sắp tới"} sub="Nhấn + để tạo booking mới"/>}
+        {shown.length===0&&<EmptyState ico="🐸" title={tab==="today"?"Hôm nay chưa có lịch":"Chưa có lịch sắp tới"} sub="Nhấn + để tạo booking mới!"/>}
 
         {shown.map(b=>(
           <div key={b.id} className="action-card" style={{borderLeft:`4px solid ${b.status==="confirmed"?T.green:b.status==="cancel"?T.red:T.yellow}`,background:b.status==="cancel"?T.redbg:T.card}}>
@@ -1866,7 +1866,7 @@ function ShopForm({shop, setShop, toast, onClose}) {
         <div className="f"><label>Facebook / Zalo / Instagram</label><input value={f.fb} onChange={e=>setF(p=>({...p,fb:e.target.value}))} placeholder="Link hoặc tên trang"/></div>
         <div className="f"><label>Lời cảm ơn cuối hóa đơn</label><input value={f.footer} onChange={e=>setF(p=>({...p,footer:e.target.value}))} placeholder="Xin cảm ơn quý khách — Hẹn gặp lại!"/></div>
         <div style={{display:"flex",gap:8}}>
-          <button className="btn btn-primary" style={{flex:2}} onClick={()=>{setShop(p=>({...p,...f}));onClose();toast("✅ Đã lưu thông tin shop!");}}>Lưu</button>
+          <button className="btn btn-primary" style={{flex:2}} onClick={()=>{setShop(p=>({...p,...f}));onClose();toast("✅ Đã lưu thông tin shop! 🐸");}}>Lưu</button>
           <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Huỷ</button>
         </div>
       </div>
@@ -1899,7 +1899,7 @@ function BankForm({shop, setShop, toast, onClose}) {
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <button className="btn btn-primary" style={{flex:2}} onClick={()=>{setShop(p=>({...p,...f}));onClose();toast("✅ Đã lưu tài khoản ngân hàng!");}}>Lưu</button>
+          <button className="btn btn-primary" style={{flex:2}} onClick={()=>{setShop(p=>({...p,...f}));onClose();toast("✅ Đã lưu tài khoản ngân hàng! 🐸");}}>Lưu</button>
           <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Huỷ</button>
         </div>
       </div>
@@ -2053,7 +2053,7 @@ function SettingsPage({logout, toast, services, setServices, shop, setShop, topi
       </div>
       <div className="sec">
         <div className="card card-green" style={{marginBottom:16,display:"flex",alignItems:"center",gap:14}}>
-          <img src="/images/logo.jpg" alt="Logo" style={{width:52,height:52,objectFit:"contain",borderRadius:10,flexShrink:0}} onError={e=>{e.target.style.display="none";}}/>
+          <img src="/images/logo.jpg" alt="Logo" style={{width:52,height:52,objectFit:"contain",borderRadius:10,flexShrink:0}} onError={e=>{e.target.outerHTML="<div style='width:52px;height:52px;font-size:36px;display:flex;align-items:center;justify-content:center'>🐸</div>";}}/>
           <div>
             <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:16}}>{shop.name}</div>
             <div style={{fontSize:12,color:T.muted}}>{shop.tagline}</div>
@@ -2155,7 +2155,7 @@ function Dashboard({nav, orders, setOrders, customers, services, bookings, setBo
     <div className="scroll-body">
       {/* Header */}
       <div className="hdr">
-        <div className="hdr-eye">Hôm nay · {new Date().toLocaleDateString("vi-VN",{weekday:"long",day:"numeric",month:"long"})}</div>
+        <div className="hdr-eye">🐸 Hôm nay · {new Date().toLocaleDateString("vi-VN",{weekday:"long",day:"numeric",month:"long"})}</div>
         <div className="hdr-h1">Mitchi Shop ✨</div>
         {unpaidOrds.length>0&&(
           <div className="hdr-badge">
@@ -2322,10 +2322,10 @@ function Dashboard({nav, orders, setOrders, customers, services, bookings, setBo
           <div style={{position:"fixed",inset:0,zIndex:97}} onClick={()=>setFabOpen(false)}/>
           <div className="fab-menu">
             {[
-              {ico:"👤",l:"Thêm khách mới",fn:()=>{setFabOpen(false);nav("customers");}},
+              {ico:"🐸",l:"Thêm khách mới",fn:()=>{setFabOpen(false);nav("customers");}},
               {ico:"📋",l:"Tạo đơn mới",   fn:()=>{setFabOpen(false);nav("orders");}},
               {ico:"📅",l:"Tạo booking",    fn:()=>{setFabOpen(false);nav("booking");}},
-              {ico:"📋",l:"Copy tin mẫu",   fn:()=>{setFabOpen(false);nav("messages");}},
+              {ico:"💬",l:"Copy tin mẫu",   fn:()=>{setFabOpen(false);nav("messages");}},
             ].map(q=>(
               <div key={q.l} className="fab-item" onClick={q.fn}>
                 <div className="fab-item-btn">{q.ico} {q.l}</div>
@@ -2369,12 +2369,16 @@ function Login({onLogin}) {
   };
   return(
     <div className="login-bg">
-      {/* Cloud decorations */}
+      {/* Cloud + Frog decorations */}
       <div style={{position:"absolute",top:40,left:-30,width:150,height:65,background:"rgba(255,255,255,.5)",borderRadius:50,border:`2px solid ${T.ink}`,zIndex:0}}/>
       <div style={{position:"absolute",top:20,left:60,width:100,height:45,background:"rgba(255,255,255,.4)",borderRadius:40,border:`2px solid ${T.ink}`,zIndex:0}}/>
       <div style={{position:"absolute",top:55,right:-20,width:130,height:55,background:"rgba(255,255,255,.45)",borderRadius:45,border:`2px solid ${T.ink}`,zIndex:0}}/>
       <div style={{position:"absolute",bottom:80,left:-40,width:180,height:70,background:"rgba(255,255,255,.3)",borderRadius:50,border:`2px solid ${T.ink}`,zIndex:0}}/>
       <div style={{position:"absolute",bottom:120,right:-30,width:120,height:50,background:"rgba(255,255,255,.35)",borderRadius:40,border:`2px solid ${T.ink}`,zIndex:0}}/>
+      <div style={{position:"absolute",top:52,left:18,fontSize:26,zIndex:1,transform:"rotate(-15deg)",opacity:.7}}>🐸</div>
+      <div style={{position:"absolute",top:28,right:22,fontSize:18,zIndex:1,transform:"rotate(10deg)",opacity:.6}}>🐸</div>
+      <div style={{position:"absolute",bottom:95,right:10,fontSize:22,zIndex:1,transform:"rotate(-8deg)",opacity:.65}}>🐸</div>
+      <div style={{position:"absolute",bottom:88,left:8,fontSize:16,zIndex:1,transform:"rotate(12deg)",opacity:.5}}>🐸</div>
       <div style={{position:"relative",zIndex:1,textAlign:"center",marginBottom:32}}>
         <div style={{width:90,height:90,borderRadius:22,border:`3px solid ${T.ink}`,boxShadow:`5px 5px 0 ${T.ink}`,background:T.card,margin:"0 auto 14px",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
           <img src="/images/logo.jpg" alt="Logo" style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none";e.target.parentNode.innerHTML="<div style='font-size:44px'>🐸</div>";}}/>
@@ -2649,7 +2653,7 @@ export default function App() {
   // Sync banner
   const SyncBanner = () => syncing ? (
     <div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:T.green,color:"#fff",textAlign:"center",fontSize:12,fontWeight:700,padding:"6px",zIndex:1000,fontFamily:"Nunito"}}>
-      ☁️ Đang đồng bộ dữ liệu...
+      🐸 Đang đồng bộ dữ liệu...
     </div>
   ) : null;
 
