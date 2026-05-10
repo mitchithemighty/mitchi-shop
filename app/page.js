@@ -2557,7 +2557,6 @@ export default function App() {
         id: "singleton",
         shop: JSON.stringify(newShop),
         topics: JSON.stringify(newTopics),
-        updated_at: new Date().toISOString(),
       });
     } catch(e) { console.error("Sync settings:", e); }
   };
