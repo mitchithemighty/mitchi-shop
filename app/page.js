@@ -96,9 +96,8 @@ const sb = {
   delete: (table, id) =>
     sbFetch(`/${table}?id=eq.${id}`, { method:"DELETE", prefer:"" }),
 
-  // DELETE all in table
-  deleteAll: (table) =>
-    sbFetch(`/${table}?id=neq.00000000-0000-0000-0000-000000000000`, { method:"DELETE", prefer:"" }),
+  // DELETE all in table — khoá an toàn để tránh xoá nhầm toàn bộ data
+  deleteAll: async () => { throw new Error("deleteAll đã bị khoá để bảo vệ dữ liệu"); },
 };
 
 
@@ -2058,7 +2057,7 @@ function TopicManager({topics, setTopics, toast}) {
 
 
 // ── SETTINGS PAGE ─────────────────────────────────────────────────────────────
-function SettingsPage({logout, toast, services, setServices, shop, setShop, topics, setTopics}) {
+function SettingsPage({logout, toast, services, setServices, shop, setShop, topics, setTopics, onExportExcel, onImportExcelClick}) {
   const [section, setSection] = useState(null);
 
   return(
@@ -2088,7 +2087,9 @@ function SettingsPage({logout, toast, services, setServices, shop, setShop, topi
           {ico:"💳",t:"Tài khoản ngân hàng",s:`ACB ${shop.acbNo||"—"}${shop.vcbNo?" · VCB "+shop.vcbNo:""}`,       fn:()=>setSection("bank")},
           {ico:"🔔",t:"Thông báo",          s:"Nhắc booking, chưa TT, follow-up",                                  fn:()=>setSection("notif")},
           {ico:"📱",t:"Cài như app (PWA)",  s:"Thêm vào màn hình chính điện thoại",                                fn:()=>setSection("pwa")},
-          {ico:"☁️",t:"Sao lưu & đồng bộ", s:"Cần setup Supabase để lưu data thật",                              fn:()=>window.open('https://supabase.com/dashboard','_blank')},
+          {ico:"📤",t:"Xuất Excel backup",   s:"Tải toàn bộ khách, đơn, lịch, dịch vụ về máy",                      fn:onExportExcel},
+          {ico:"📥",t:"Nhập Excel backup",   s:"Khôi phục/gộp dữ liệu từ file Excel backup",                       fn:onImportExcelClick},
+          {ico:"☁️",t:"Sao lưu & đồng bộ", s:"Mở Supabase dashboard để kiểm tra backup cloud",                    fn:()=>window.open('https://supabase.com/dashboard','_blank')},
         ].map(x=>(
           <div key={x.t} className="row" onClick={x.fn}>
             <div style={{fontSize:22,width:36,textAlign:"center",flexShrink:0}}>{x.ico}</div>
@@ -2499,6 +2500,70 @@ if (typeof window !== "undefined") {
     s.async = true;
     document.head.appendChild(s);
   }
+  if (!window.XLSX) {
+    const x = document.createElement("script");
+    x.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    x.async = true;
+    document.head.appendChild(x);
+  }
+}
+
+
+function waitForXLSX() {
+  return new Promise((resolve, reject) => {
+    if (typeof window !== "undefined" && window.XLSX) return resolve(window.XLSX);
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      if (typeof window !== "undefined" && window.XLSX) {
+        clearInterval(timer); resolve(window.XLSX);
+      }
+      if (tries > 80) {
+        clearInterval(timer); reject(new Error("Không tải được thư viện Excel. Hãy kiểm tra mạng rồi thử lại."));
+      }
+    }, 150);
+  });
+}
+
+function safeJson(v, fallback) {
+  if (v === undefined || v === null || v === "") return fallback;
+  if (typeof v !== "string") return v;
+  try { return JSON.parse(v); } catch { return fallback; }
+}
+
+function excelRows(rows) {
+  return (rows || []).map(r => {
+    const out = {...r};
+    Object.keys(out).forEach(k => {
+      if (Array.isArray(out[k]) || (out[k] && typeof out[k] === "object")) out[k] = JSON.stringify(out[k]);
+    });
+    return out;
+  });
+}
+
+function normalizeImported(table, rows) {
+  return (rows || []).filter(Boolean).map(r => {
+    const x = {...r};
+    if (table === "orders") {
+      x.items = safeJson(x.items, []);
+      x.extraQ = Number(x.extraQ || 0);
+      x.total = Number(x.total || 0);
+      x.tips = Number(x.tips || 0);
+    }
+    if (table === "customers") {
+      x.tags = safeJson(x.tags, []);
+    }
+    if (table === "replies") {
+      x.images = safeJson(x.images, []);
+    }
+    if (table === "services") {
+      x.price = Number(x.price || 0);
+      x.price6 = Number(x.price6 || 0);
+      x.dur = Number(x.dur || 0);
+      x.active = x.active === true || x.active === "true" || x.active === 1 || x.active === "1";
+    }
+    return x;
+  }).filter(x => x.id);
 }
 
 export default function App() {
@@ -2515,6 +2580,7 @@ export default function App() {
   const [topics,    setTopics]    = useState(["Tình yêu","Hôn nhân / Ex","Sự nghiệp","Tài chính","Gia đình","Sức khỏe","Tổng quát"]);
   const [dbReady,   setDbReady]   = useState(false);
   const [syncing,   setSyncing]   = useState(false);
+  const importExcelRef = useRef(null);
 
   const toast = msg => { setToast(msg); setTimeout(()=>setToast(""), 2500); };
   const nav   = id  => setPage(id);
@@ -2687,6 +2753,82 @@ export default function App() {
   const createOrderFor = custId => { setDefCustId(custId); setPage("orders"); };
   const clearDef = () => setDefCustId(null);
 
+  const exportExcel = async () => {
+    try {
+      const XLSX = await waitForXLSX();
+      const wb = XLSX.utils.book_new();
+      const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
+      const meta = [{
+        app: "Mitchi Shop Manager",
+        exported_at: new Date().toLocaleString("vi-VN"),
+        services: services.length,
+        customers: customers.length,
+        orders: orders.length,
+        bookings: bookings.length,
+        replies: replies.length,
+      }];
+      [
+        ["README", meta],
+        ["services", excelRows(services)],
+        ["customers", excelRows(customers)],
+        ["orders", excelRows(orders)],
+        ["bookings", excelRows(bookings)],
+        ["replies", excelRows(replies)],
+        ["shop_settings", [{id:"singleton", shop:JSON.stringify(shop), topics:JSON.stringify(topics)}]],
+      ].forEach(([name, rows]) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), name));
+      XLSX.writeFile(wb, `mitchi-backup-${stamp}.xlsx`);
+      toast("✅ Đã xuất file Excel backup!");
+    } catch(e) {
+      console.error(e);
+      toast("⚠️ Không xuất được Excel: " + e.message);
+    }
+  };
+
+  const importExcel = async (file) => {
+    if (!file) return;
+    if (!confirm("Nhập Excel sẽ GỘP/CẬP NHẬT dữ liệu theo id, không xoá dữ liệu hiện tại. Tiếp tục?")) return;
+    setSyncing(true);
+    try {
+      const XLSX = await waitForXLSX();
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:"array"});
+      const sheet = name => wb.SheetNames.includes(name) ? XLSX.utils.sheet_to_json(wb.Sheets[name], {defval:""}) : [];
+
+      const svcs = normalizeImported("services", sheet("services"));
+      const custs = normalizeImported("customers", sheet("customers"));
+      const ords  = normalizeImported("orders", sheet("orders"));
+      const bks   = normalizeImported("bookings", sheet("bookings"));
+      const reps  = normalizeImported("replies", sheet("replies"));
+      const st    = sheet("shop_settings")[0];
+
+      if (svcs.length) setServices(prev => [...prev.filter(x=>!svcs.some(y=>y.id===x.id)), ...svcs]);
+      if (custs.length) setCustomers(prev => [...prev.filter(x=>!custs.some(y=>y.id===x.id)), ...custs]);
+      if (ords.length)  setOrders(prev => [...ords, ...prev.filter(x=>!ords.some(y=>y.id===x.id))]);
+      if (bks.length)   setBookings(prev => [...prev.filter(x=>!bks.some(y=>y.id===x.id)), ...bks]);
+      if (reps.length)  setReplies(prev => [...prev.filter(x=>!reps.some(y=>y.id===x.id)), ...reps]);
+      if (st?.shop)   setShop(safeJson(st.shop, shop));
+      if (st?.topics) setTopics(safeJson(st.topics, topics));
+
+      if (dbReady) {
+        await Promise.all([
+          ...svcs.map(x => sb.upsert("services", x)),
+          ...custs.map(x => sb.upsert("customers", x)),
+          ...ords.map(x => sb.upsert("orders", {...x, items:JSON.stringify(x.items||[])})),
+          ...bks.map(x => sb.upsert("bookings", x)),
+          ...reps.map(x => sb.upsert("replies", {...x, images:JSON.stringify(x.images||[])})),
+          st ? sb.upsert("shop_settings", {id:"singleton", shop:st.shop || JSON.stringify(shop), topics:st.topics || JSON.stringify(topics)}) : Promise.resolve(),
+        ]);
+      }
+      toast(`✅ Đã nhập Excel: ${custs.length} khách, ${ords.length} đơn, ${bks.length} lịch`);
+    } catch(e) {
+      console.error(e);
+      toast("⚠️ Không nhập được Excel: " + e.message);
+    } finally {
+      setSyncing(false);
+      if (importExcelRef.current) importExcelRef.current.value = "";
+    }
+  };
+
   // Sync banner
   const SyncBanner = () => syncing ? (
     <div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:T.green,color:"#fff",textAlign:"center",fontSize:12,fontWeight:700,padding:"6px",zIndex:1000,fontFamily:"Nunito"}}>
@@ -2733,6 +2875,8 @@ export default function App() {
       services={services} setServices={setServicesAndSync}
       shop={shop} setShop={setShopAndSync}
       topics={topics} setTopics={setTopicsAndSync}
+      onExportExcel={exportExcel}
+      onImportExcelClick={()=>importExcelRef.current?.click()}
     />,
   };
 
@@ -2745,6 +2889,7 @@ export default function App() {
         <div className="app">
           <SyncBanner/>
           {toastMsg&&<div className="toast">{toastMsg}</div>}
+          <input ref={importExcelRef} type="file" accept=".xlsx,.xls" style={{display:"none"}} onChange={e=>importExcel(e.target.files?.[0])}/>
           {pages[page]||pages.dashboard}
           <nav className="bnav">
             {NAV_ITEMS.map(n=>(
