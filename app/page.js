@@ -356,10 +356,10 @@ const REPLIES = [
 const WEEK_DAYS = ["T2","T3","T4","T5","T6","T7","CN"];
 const WEEK_COLORS = [T.green, T.blue, T.yellow, T.green, "#52B788", T.purple, T.red];
 
-// ── SEED DATA ─────────────────────────────────────────────────────────────────
-const SEED_SVCS = [];
-const SEED_CUSTS = [];
-const SEED_ORDERS = [];
+// ── SEED DATA — intentionally empty, all data comes from Supabase ─────────────
+const SEED_SVCS     = [];
+const SEED_CUSTS    = [];
+const SEED_ORDERS   = [];
 const SEED_BOOKINGS = [];
 
 // ── SHARED COMPONENTS ─────────────────────────────────────────────────────────
@@ -821,7 +821,7 @@ function OrderDetail({order, customers, services, onUpdate, onDelete, onClose, t
 }
 
 // ── ORDERS PAGE ───────────────────────────────────────────────────────────────
-function OrdersPage({orders, setOrders, saveOrder, customers, services, toast, defaultCustId, clearDefaultCust, shop, topics, setTopics}) {
+function OrdersPage({orders, setOrders, saveOrder, deleteOrder, customers, services, toast, defaultCustId, clearDefaultCust, shop, topics, setTopics}) {
   const [filter,   setFilter]   = useState("all");
   const [showNew,  setShowNew]  = useState(!!defaultCustId);
   const [selId,    setSelId]    = useState(null);
@@ -2532,24 +2532,24 @@ export default function App() {
         sbFetch("/shop_settings?id=eq.singleton"),
       ]);
       // Parse JSON fields from Supabase string columns
-      if (svcs.length)  setServices(svcs);
-      if (custs.length) setCustomers(custs);
-      if (ords.length)  setOrders(ords.map(o => ({
+      setServices(svcs.length ? svcs : []);
+      setCustomers(custs.length ? custs : []);
+      setOrders(ords.length ? ords.map(o => ({
         ...o,
         custId: o.custId || o["custId"] || "",
         items:  (() => { try { return typeof o.items==="string" ? JSON.parse(o.items||"[]") : (o.items||[]); } catch { return []; } })(),
         extraQ: Number(o.extraQ || 0),
         total:  Number(o.total  || 0),
         tips:   Number(o.tips   || 0),
-      })));
-      if (bks.length)   setBookings(bks);
-      if (reps.length)  setReplies(reps.map(r => ({
+      })) : []);
+      setBookings(bks.length ? bks : []);
+      setReplies(reps.length ? reps.map(r => ({
         ...r,
         images: (() => {
           try { return r.images ? JSON.parse(r.images) : []; }
           catch { return []; }
         })(),
-      })));
+      })) : REPLIES);
       if (settings.length) {
         const s = settings[0];
         if (s.shop)   { try { setShop(JSON.parse(s.shop)); }   catch{} }
@@ -2568,6 +2568,7 @@ export default function App() {
 
   // ── Auto-sync helpers ─────────────────────────────────────────────────
   const syncSettings = async (newShop, newTopics) => {
+    if (!dbReady) return;
     try {
       await sb.upsert("shop_settings", {
         id: "singleton",
@@ -2598,7 +2599,7 @@ export default function App() {
   const setServicesAndSync = (updater) => {
     setServices(prev => {
       const next = typeof updater==="function" ? updater(prev) : updater;
-      // Sync changed services
+      if (!dbReady) return next;
       const prevIds = prev.map(s=>s.id);
       const nextIds = next.map(s=>s.id);
       // Upsert all
@@ -2612,6 +2613,7 @@ export default function App() {
   const setCustomersAndSync = (updater) => {
     setCustomers(prev => {
       const next = typeof updater==="function" ? updater(prev) : updater;
+      if (!dbReady) return next;
       const prevIds = prev.map(c=>c.id);
       const nextIds = next.map(c=>c.id);
       next.forEach(c => sb.upsert("customers", {
@@ -2628,6 +2630,7 @@ export default function App() {
   const setBookingsAndSync = (updater) => {
     setBookings(prev => {
       const next = typeof updater==="function" ? updater(prev) : updater;
+      if (!dbReady) return next;
       const prevIds = prev.map(b=>b.id);
       const nextIds = next.map(b=>b.id);
       next.forEach(b => sb.upsert("bookings", b).catch(console.error));
@@ -2639,6 +2642,7 @@ export default function App() {
   const setRepliesAndSync = (updater) => {
     setReplies(prev => {
       const next = typeof updater==="function" ? updater(prev) : updater;
+      if (!dbReady) return next;
       const prevIds = prev.map(r=>r.id);
       const nextIds = next.map(r=>r.id);
       next.forEach(r => sb.upsert("replies", {...r, images: JSON.stringify(r.images||[])}).catch(console.error));
@@ -2698,7 +2702,7 @@ export default function App() {
       toast={toast} shop={shop}
     />,
     orders: <OrdersPage
-      orders={orders} setOrders={setOrders} saveOrder={saveOrder}
+      orders={orders} setOrders={setOrders} saveOrder={saveOrder} deleteOrder={deleteOrder}
       customers={customers} services={services} toast={toast}
       defaultCustId={defCustId} clearDefaultCust={clearDef} shop={shop}
       topics={topics} setTopics={setTopics}
