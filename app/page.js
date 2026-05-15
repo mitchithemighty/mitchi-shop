@@ -202,6 +202,7 @@ body{background:${T.bg};font-family:'Nunito Sans',sans-serif;color:${T.ink};-web
 .bd-view{background:${T.purplebg};color:${T.purple}}
 .bd-can{background:${T.redbg};color:${T.red}}
 .bd-confirm{background:${T.greenbg};color:${T.green}}
+.bd-wait{background:#FFF3E0;color:#E65100;border-color:#FFB74D}
 
 /* TAG */
 .tg{display:inline-flex;align-items:center;padding:2px 8px;border-radius:8px;border:1.5px solid ${T.ink};font-size:10px;font-weight:800;margin-right:4px;margin-top:3px;font-family:'Nunito',sans-serif}
@@ -1139,14 +1140,17 @@ function CustomerModal({form, setForm, onSave, onClose, isEdit}) {
 
 // ── BOOKING PAGE ──────────────────────────────────────────────────────────────
 function BookingPage({bookings, setBookings, customers, services, orders, setOrders, saveOrder, toast}) {
-  const [showNew,  setShowNew]  = useState(false);
-  const [selId,    setSelId]    = useState(null);
-  const [tab,      setTab]      = useState("today");
-  const [form,     setForm]     = useState({custId:"",svcId:"",date:todayStr(),time:"",notes:""});
+  const [showNew,     setShowNew]     = useState(false);
+  const [newType,     setNewType]     = useState("booking"); // "booking" | "waiting"
+  const [tab,         setTab]         = useState("today");
+  const [form,        setForm]        = useState({custId:"",svcId:"",date:todayStr(),time:"",notes:""});
+  const [scheduleId,  setScheduleId]  = useState(null); // id booking chờ đang đặt lịch
+  const [schedForm,   setSchedForm]   = useState({date:todayStr(),time:""});
 
-  const todayBks = bookings.filter(b=>b.date===todayStr());
-  const upcomBks = bookings.filter(b=>b.date!==todayStr());
-  const shown    = tab==="today"?todayBks:upcomBks;
+  const todayBks   = bookings.filter(b=>b.status!=="waiting"&&b.date===todayStr());
+  const upcomBks   = bookings.filter(b=>b.status!=="waiting"&&b.date!==todayStr()&&b.status!=="cancel");
+  const waitingBks = bookings.filter(b=>b.status==="waiting");
+  const shown = tab==="today"?todayBks : tab==="upcoming"?upcomBks : waitingBks;
 
   const cName = id => customers.find(c=>c.id===id)?.name||"?";
   const cAva  = id => customers.find(c=>c.id===id)?.ava||"👤";
@@ -1156,20 +1160,44 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
   const fd  = new Date(new Date().getFullYear(),new Date().getMonth(),1).getDay();
   const dim = new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
   const cells = Array(fd).fill(null).concat(Array.from({length:dim},(_,i)=>i+1));
-  const hasBk = d => bookings.some(b=>{
-    const parts=b.date.split("/");
+  const hasBk = d => bookings.filter(b=>b.status!=="waiting").some(b=>{
+    const parts=(b.date||"").split("/");
     return parseInt(parts[0])===d&&parseInt(parts[1])===new Date().getMonth()+1;
   });
 
+  // Tạo booking thường (có ngày giờ)
   const addBk = () => {
-    if(!form.custId||!form.svcId||!form.time) { alert("Điền đầy đủ thông tin!"); return; }
+    if(!form.custId||!form.svcId||!form.time){toast("⚠️ Điền đủ khách, dịch vụ và giờ!"); return;}
     setBookings(p=>[...p,{id:uid(),...form,status:"pending"}]);
-    setShowNew(false); setForm({custId:"",svcId:"",date:todayStr(),time:"",notes:""});
+    setShowNew(false);
+    setForm({custId:"",svcId:"",date:todayStr(),time:"",notes:""});
     toast("📅 Đã tạo booking!");
   };
 
+  // Tạo booking chờ (chưa có ngày giờ)
+  const addWaiting = () => {
+    if(!form.custId||!form.svcId){toast("⚠️ Chọn khách và dịch vụ!"); return;}
+    setBookings(p=>[...p,{id:uid(),custId:form.custId,svcId:form.svcId,notes:form.notes,date:"",time:"",status:"waiting"}]);
+    setShowNew(false);
+    setForm({custId:"",svcId:"",date:todayStr(),time:"",notes:""});
+    toast("⏳ Đã thêm vào danh sách chờ!");
+  };
+
+  // Đặt lịch cho booking chờ → chuyển sang pending
+  const scheduleWaiting = () => {
+    if(!schedForm.date||!schedForm.time){toast("⚠️ Nhập ngày và giờ!"); return;}
+    setBookings(p=>p.map(b=>b.id===scheduleId
+      ? {...b, date:schedForm.date, time:schedForm.time, status:"pending"}
+      : b
+    ));
+    setScheduleId(null);
+    setSchedForm({date:todayStr(),time:""});
+    toast("📅 Đã đặt lịch thành công!");
+  };
+
   const confirm = id => { setBookings(p=>p.map(b=>b.id===id?{...b,status:"confirmed"}:b)); toast("✅ Đã xác nhận!"); };
-  const cancel  = id => { setBookings(p=>p.map(b=>b.id===id?{...b,status:"cancel"}:b));    toast("🗑 Đã huỷ!"); };
+  const cancel  = id => { setBookings(p=>p.map(b=>b.id===id?{...b,status:"cancel"}:b)); toast("🗑 Đã huỷ!"); };
+  const deleteBk = id => { setBookings(p=>p.filter(b=>b.id!==id)); toast("🗑 Đã xoá!"); };
 
   const createOrderFromBk = bk => {
     const o={id:uid(),custId:bk.custId,items:[{svcId:bk.svcId,qty:"",group:""}],extraQ:0,total:0,tips:0,status:"new",date:todayStr(),time:nowStr(),notes:bk.notes||""};
@@ -1177,71 +1205,169 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
     toast("📋 Đã tạo đơn từ booking!");
   };
 
-  const sendQR = bk => { navigator.clipboard?.writeText(REPLIES[3].body); toast("📋 Copy tin nhắn QR!"); };
-
-  const selBk = bookings.find(b=>b.id===selId);
-
   return(
     <div className="scroll-body">
       <div className="hdr">
         <div className="hdr-eye">Lịch làm việc</div>
         <div className="hdr-h1">Booking</div>
-        <div className="hdr-sub">{todayBks.length} lịch hôm nay · {todayBks.filter(b=>b.status==="confirmed").length} đã xác nhận</div>
-      </div>
-
-      {/* Mini calendar */}
-      <div className="sec" style={{paddingTop:16}}>
-        <div className="cal-hd">{["CN","T2","T3","T4","T5","T6","T7"].map(d=><div key={d} className="cal-dh">{d}</div>)}</div>
-        <div className="cal-g">
-          {cells.map((d,i)=>(
-            <div key={i} className={`cd ${d===today2?"today":""} ${hasBk(d)?"has":""}`}>{d||""}</div>
-          ))}
+        <div className="hdr-sub">
+          {todayBks.length} hôm nay · {waitingBks.length} đang chờ lịch
         </div>
       </div>
+
+      {/* Mini calendar — chỉ hiện khi không ở tab waiting */}
+      {tab!=="waiting"&&(
+        <div className="sec" style={{paddingTop:16}}>
+          <div className="cal-hd">{["CN","T2","T3","T4","T5","T6","T7"].map(d=><div key={d} className="cal-dh">{d}</div>)}</div>
+          <div className="cal-g">
+            {cells.map((d,i)=>(
+              <div key={i} className={`cd ${d===today2?"today":""} ${hasBk(d)?"has":""}`}>{d||""}</div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="sec">
+        {/* Tabs */}
         <div className="pill-row">
-          <button className={`pill ${tab==="today"?"on":""}`} onClick={()=>setTab("today")}>Hôm nay ({todayBks.length})</button>
-          <button className={`pill ${tab==="upcoming"?"on":""}`} onClick={()=>setTab("upcoming")}>Sắp tới ({upcomBks.length})</button>
+          <button className={`pill ${tab==="today"?"on":""}`} onClick={()=>setTab("today")}>
+            Hôm nay ({todayBks.length})
+          </button>
+          <button className={`pill ${tab==="upcoming"?"on":""}`} onClick={()=>setTab("upcoming")}>
+            Sắp tới ({upcomBks.length})
+          </button>
+          <button className={`pill ${tab==="waiting"?"on":""}`} onClick={()=>setTab("waiting")}
+            style={waitingBks.length>0&&tab!=="waiting"?{borderColor:T.orange,color:T.orange}:{}}>
+            ⏳ Chờ lịch {waitingBks.length>0?`(${waitingBks.length})`:""}
+          </button>
         </div>
 
-        {shown.length===0&&<EmptyState ico="🐸" title={tab==="today"?"Hôm nay chưa có lịch":"Chưa có lịch sắp tới"} sub="Nhấn + để tạo booking mới!"/>}
+        {/* Waiting list header info */}
+        {tab==="waiting"&&(
+          <div className="action-card action-card-yellow" style={{marginBottom:10}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.ink}}>
+              📋 Khách muốn đặt nhưng chưa chọn được ngày/giờ
+            </div>
+            <div style={{fontSize:11,color:T.muted,marginTop:4}}>
+              Nhấn <strong>"Đặt lịch"</strong> khi khách đã sẵn sàng → tự chuyển sang booking chính thức
+            </div>
+          </div>
+        )}
 
+        {/* Empty state */}
+        {shown.length===0&&(
+          <EmptyState
+            ico="🐸"
+            title={tab==="today"?"Hôm nay chưa có lịch":tab==="upcoming"?"Chưa có lịch sắp tới":"Chưa có khách nào trong danh sách chờ"}
+            sub={tab==="waiting"?"Nhấn + → Thêm vào danh sách chờ":"Nhấn + để tạo booking mới!"}
+          />
+        )}
+
+        {/* Booking cards */}
         {shown.map(b=>(
-          <div key={b.id} className="action-card" style={{borderLeft:`4px solid ${b.status==="confirmed"?T.green:b.status==="cancel"?T.red:T.yellow}`,background:b.status==="cancel"?T.redbg:T.card}}>
+          <div key={b.id} className="action-card" style={{
+            borderLeft:`4px solid ${
+              b.status==="confirmed"?T.green:
+              b.status==="cancel"?T.red:
+              b.status==="waiting"?"#FF9800":
+              T.yellow
+            }`,
+            background:b.status==="cancel"?T.redbg:b.status==="waiting"?"#FFF8E1":T.card,
+            marginBottom:10,
+          }}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
               <div style={{fontSize:24}}>{cAva(b.custId)}</div>
               <div style={{flex:1}}>
-                <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{b.time} · {cName(b.custId)}</div>
-                <div style={{fontSize:12,color:T.muted}}>{sName(b.svcId)}{b.notes?` · ${b.notes}`:""}</div>
+                <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>
+                  {b.status==="waiting"
+                    ? cName(b.custId)
+                    : `${b.time} · ${cName(b.custId)}`
+                  }
+                </div>
+                <div style={{fontSize:12,color:T.muted}}>
+                  {sName(b.svcId)}{b.notes?` · ${b.notes}`:""}
+                </div>
+                {b.status==="waiting"&&(
+                  <div style={{fontSize:11,color:"#E65100",fontWeight:700,marginTop:2}}>
+                    ⏳ Chưa có ngày · Chờ xếp lịch
+                  </div>
+                )}
+                {b.status!=="waiting"&&b.date&&(
+                  <div style={{fontSize:11,color:T.muted}}>{b.date}</div>
+                )}
               </div>
-              <span className={`bd ${b.status==="confirmed"?"bd-confirm":b.status==="cancel"?"bd-can":"bd-pend"}`}>
-                {b.status==="confirmed"?"XÁC NHẬN":b.status==="cancel"?"ĐÃ HUỶ":"CHỜ"}
+              <span className={`bd ${
+                b.status==="confirmed"?"bd-confirm":
+                b.status==="cancel"?"bd-can":
+                b.status==="waiting"?"bd-wait":
+                "bd-pend"
+              }`}>
+                {b.status==="confirmed"?"XÁC NHẬN":
+                 b.status==="cancel"?"ĐÃ HUỶ":
+                 b.status==="waiting"?"CHỜ LỊCH":
+                 "CHỜ XÁC NHẬN"}
               </span>
             </div>
 
-            {b.status!=="cancel"&&(
+            {/* Actions */}
+            {b.status==="waiting"&&(
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                <button className="xs xs-green"
+                  onClick={()=>{setScheduleId(b.id);setSchedForm({date:todayStr(),time:""});}}>
+                  📅 Đặt lịch
+                </button>
+                <button className="xs xs-green" onClick={()=>createOrderFromBk(b)}>📋 Tạo đơn</button>
+                <button className="xs" onClick={()=>{navigator.clipboard?.writeText(`Bạn ơi Mitchi đã có lịch trống rồi nha! Bạn muốn đặt ngày nào thì nhắn Mitchi nhé 🐸`);toast("📋 Đã copy tin báo lịch!");}}>
+                  💬 Báo có lịch
+                </button>
+                <button className="xs xs-red" onClick={()=>deleteBk(b.id)}>🗑 Xoá</button>
+              </div>
+            )}
+
+            {b.status!=="waiting"&&b.status!=="cancel"&&(
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {b.status==="pending"&&(
                   <button className="xs xs-green" onClick={()=>confirm(b.id)}>✅ Xác nhận</button>
                 )}
                 <button className="xs xs-green" onClick={()=>createOrderFromBk(b)}>📋 Tạo đơn</button>
-                <button className="xs" onClick={()=>sendQR(b)}>📤 Gửi QR</button>
-                <button className="xs" onClick={()=>{navigator.clipboard?.writeText(REPLIES[4].body);toast("📋 Copy tin nhắc TT!");}}>💸 Nhắc TT</button>
-                {b.status!=="cancel"&&<button className="xs xs-red" onClick={()=>cancel(b.id)}>✕ Huỷ</button>}
+                <button className="xs" onClick={()=>{navigator.clipboard?.writeText("https://mitchi-shop.vercel.app");toast("📋 Copy QR link!");}}>📤 Gửi QR</button>
+                <button className="xs" onClick={()=>{
+                  const r=["Bạn ơi đây là hóa đơn xem bài nhé! 🌙
+Bạn chuyển khoản giúp Mitchi với nha 💜"];
+                  navigator.clipboard?.writeText(r[0]);toast("📋 Copy nhắc TT!");
+                }}>💸 Nhắc TT</button>
+                <button className="xs xs-red" onClick={()=>cancel(b.id)}>✕ Huỷ</button>
               </div>
             )}
           </div>
         ))}
       </div>
 
-      <button className="fab" onClick={()=>setShowNew(true)}>{I.plus}</button>
+      {/* FAB */}
+      <button className="fab" onClick={()=>{setNewType("booking");setShowNew(true);}}>{I.plus}</button>
 
+      {/* Modal tạo booking */}
       {showNew&&(
         <div className="overlay" onClick={e=>e.target===e.currentTarget&&setShowNew(false)}>
           <div className="sheet">
             <DragHandle/>
             <div className="sheet-title">Tạo Booking Mới</div>
+
+            {/* Loại booking */}
+            <div style={{display:"flex",gap:8,marginBottom:16}}>
+              {[
+                {k:"booking", l:"📅 Có ngày giờ",  s:"Khách đã chọn được lịch"},
+                {k:"waiting", l:"⏳ Chờ xếp lịch", s:"Chưa có ngày giờ cụ thể"},
+              ].map(t=>(
+                <button key={t.k} onClick={()=>setNewType(t.k)}
+                  style={{flex:1,padding:"10px 8px",borderRadius:12,border:`2px solid ${newType===t.k?T.ink:T.border}`,
+                    background:newType===t.k?T.ink:"transparent",cursor:"pointer",transition:"all .15s",textAlign:"center"}}>
+                  <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:12,color:newType===t.k?"#fff":T.ink}}>{t.l}</div>
+                  <div style={{fontSize:10,color:newType===t.k?"rgba(255,255,255,.6)":T.muted,marginTop:2}}>{t.s}</div>
+                </button>
+              ))}
+            </div>
+
             <div className="f">
               <label>Khách hàng</label>
               <select value={form.custId} onChange={e=>setForm(p=>({...p,custId:e.target.value}))}>
@@ -1256,27 +1382,92 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
                 {services.filter(s=>s.active).map(s=><option key={s.id} value={s.id}>{s.ico} {s.name}</option>)}
               </select>
             </div>
-            <div style={{display:"flex",gap:8}}>
-              <div className="f" style={{flex:1}}>
-                <label>Ngày (DD/MM/YYYY)</label>
-                <input placeholder={todayStr()} value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value}))}/>
+
+            {/* Ngày giờ chỉ hiện khi booking thường */}
+            {newType==="booking"&&(
+              <div style={{display:"flex",gap:8}}>
+                <div className="f" style={{flex:1}}>
+                  <label>Ngày (DD/MM/YYYY)</label>
+                  <input placeholder={todayStr()} value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value}))}/>
+                </div>
+                <div className="f" style={{flex:1}}>
+                  <label>Giờ</label>
+                  <input type="time" value={form.time} onChange={e=>setForm(p=>({...p,time:e.target.value}))}/>
+                </div>
               </div>
-              <div className="f" style={{flex:1}}>
-                <label>Giờ</label>
-                <input type="time" value={form.time} onChange={e=>setForm(p=>({...p,time:e.target.value}))}/>
+            )}
+
+            {/* Thông tin khi booking chờ */}
+            {newType==="waiting"&&(
+              <div className="card card-yellow" style={{marginBottom:12,fontSize:12,color:T.ink,lineHeight:1.6}}>
+                ⏳ Khách sẽ được thêm vào <strong>danh sách chờ</strong>.<br/>
+                Khi có lịch trống, nhấn <strong>"Đặt lịch"</strong> để xếp ngày giờ.
               </div>
-            </div>
+            )}
+
             <div className="f">
               <label>Ghi chú</label>
-              <textarea placeholder="Ghi chú..." value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))}/>
+              <textarea placeholder="Ghi chú về dịch vụ, yêu cầu đặc biệt..." value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))}/>
             </div>
+
             <div style={{display:"flex",gap:8}}>
-              <button className="btn btn-primary" style={{flex:2}} onClick={addBk}>📅 Tạo booking</button>
+              <button className="btn btn-primary" style={{flex:2}}
+                onClick={newType==="booking"?addBk:addWaiting}>
+                {newType==="booking"?"📅 Tạo booking":"⏳ Thêm vào danh sách chờ"}
+              </button>
               <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setShowNew(false)}>Huỷ</button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Modal đặt lịch cho booking chờ */}
+      {scheduleId&&(()=>{
+        const bk = bookings.find(b=>b.id===scheduleId);
+        if(!bk) return null;
+        return(
+          <div className="overlay" onClick={e=>e.target===e.currentTarget&&setScheduleId(null)}>
+            <div className="sheet">
+              <DragHandle/>
+              <div className="sheet-title">📅 Đặt lịch cho khách</div>
+
+              {/* Thông tin khách */}
+              <div className="card card-blue" style={{marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{fontSize:28}}>{cAva(bk.custId)}</div>
+                <div>
+                  <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{cName(bk.custId)}</div>
+                  <div style={{fontSize:12,color:T.muted}}>{sName(bk.svcId)}</div>
+                  {bk.notes&&<div style={{fontSize:11,color:T.muted,marginTop:2}}>📝 {bk.notes}</div>}
+                </div>
+              </div>
+
+              <div style={{display:"flex",gap:8}}>
+                <div className="f" style={{flex:1}}>
+                  <label>Ngày xem bài (DD/MM/YYYY)</label>
+                  <input placeholder={todayStr()} value={schedForm.date}
+                    onChange={e=>setSchedForm(p=>({...p,date:e.target.value}))}/>
+                </div>
+                <div className="f" style={{flex:1}}>
+                  <label>Giờ</label>
+                  <input type="time" value={schedForm.time}
+                    onChange={e=>setSchedForm(p=>({...p,time:e.target.value}))}/>
+                </div>
+              </div>
+
+              <div className="card card-green" style={{marginBottom:14,fontSize:12,color:T.green,lineHeight:1.6}}>
+                ✅ Sau khi xác nhận, booking sẽ chuyển sang <strong>Chờ xác nhận</strong> với ngày giờ đã chọn
+              </div>
+
+              <div style={{display:"flex",gap:8}}>
+                <button className="btn btn-green" style={{flex:2}} onClick={scheduleWaiting}>
+                  📅 Xác nhận lịch
+                </button>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setScheduleId(null)}>Huỷ</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
