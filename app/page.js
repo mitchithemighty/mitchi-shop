@@ -1422,52 +1422,43 @@ Bạn chuyển khoản giúp Mitchi với nha 💜"];
       )}
 
       {/* Modal đặt lịch cho booking chờ */}
-      {scheduleId&&(()=>{
-        const bk = bookings.find(b=>b.id===scheduleId);
-        if(!bk) return null;
-        return(
-          <div className="overlay" onClick={e=>e.target===e.currentTarget&&setScheduleId(null)}>
-            <div className="sheet">
-              <DragHandle/>
-              <div className="sheet-title">📅 Đặt lịch cho khách</div>
-
-              {/* Thông tin khách */}
-              <div className="card card-blue" style={{marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
-                <div style={{fontSize:28}}>{cAva(bk.custId)}</div>
-                <div>
-                  <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{cName(bk.custId)}</div>
-                  <div style={{fontSize:12,color:T.muted}}>{sName(bk.svcId)}</div>
-                  {bk.notes&&<div style={{fontSize:11,color:T.muted,marginTop:2}}>📝 {bk.notes}</div>}
-                </div>
-              </div>
-
-              <div style={{display:"flex",gap:8}}>
-                <div className="f" style={{flex:1}}>
-                  <label>Ngày xem bài (DD/MM/YYYY)</label>
-                  <input placeholder={todayStr()} value={schedForm.date}
-                    onChange={e=>setSchedForm(p=>({...p,date:e.target.value}))}/>
-                </div>
-                <div className="f" style={{flex:1}}>
-                  <label>Giờ</label>
-                  <input type="time" value={schedForm.time}
-                    onChange={e=>setSchedForm(p=>({...p,time:e.target.value}))}/>
-                </div>
-              </div>
-
-              <div className="card card-green" style={{marginBottom:14,fontSize:12,color:T.green,lineHeight:1.6}}>
-                ✅ Sau khi xác nhận, booking sẽ chuyển sang <strong>Chờ xác nhận</strong> với ngày giờ đã chọn
-              </div>
-
-              <div style={{display:"flex",gap:8}}>
-                <button className="btn btn-green" style={{flex:2}} onClick={scheduleWaiting}>
-                  📅 Xác nhận lịch
-                </button>
-                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setScheduleId(null)}>Huỷ</button>
+      {scheduleId&&bookings.find(b=>b.id===scheduleId)&&(
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setScheduleId(null)}>
+          <div className="sheet">
+            <DragHandle/>
+            <div className="sheet-title">📅 Đặt lịch cho khách</div>
+            <div className="card card-blue" style={{marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+              <div style={{fontSize:28}}>{cAva(bookings.find(b=>b.id===scheduleId).custId)}</div>
+              <div>
+                <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{cName(bookings.find(b=>b.id===scheduleId).custId)}</div>
+                <div style={{fontSize:12,color:T.muted}}>{sName(bookings.find(b=>b.id===scheduleId).svcId)}</div>
+                {bookings.find(b=>b.id===scheduleId).notes&&(
+                  <div style={{fontSize:11,color:T.muted,marginTop:2}}>📝 {bookings.find(b=>b.id===scheduleId).notes}</div>
+                )}
               </div>
             </div>
+            <div style={{display:"flex",gap:8}}>
+              <div className="f" style={{flex:1}}>
+                <label>Ngày xem bài (DD/MM/YYYY)</label>
+                <input placeholder={todayStr()} value={schedForm.date}
+                  onChange={e=>setSchedForm(p=>({...p,date:e.target.value}))}/>
+              </div>
+              <div className="f" style={{flex:1}}>
+                <label>Giờ</label>
+                <input type="time" value={schedForm.time}
+                  onChange={e=>setSchedForm(p=>({...p,time:e.target.value}))}/>
+              </div>
+            </div>
+            <div className="card card-green" style={{marginBottom:14,fontSize:12,color:T.green,lineHeight:1.6}}>
+              Sau khi xác nhận, booking sẽ chuyển sang <strong>Chờ xác nhận</strong> với ngày giờ đã chọn
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-green" style={{flex:2}} onClick={scheduleWaiting}>📅 Xác nhận lịch</button>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setScheduleId(null)}>Huỷ</button>
+            </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
     </div>
   );
 }
