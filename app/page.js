@@ -1331,11 +1331,7 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
                 )}
                 <button className="xs xs-green" onClick={()=>createOrderFromBk(b)}>📋 Tạo đơn</button>
                 <button className="xs" onClick={()=>{navigator.clipboard?.writeText("https://mitchi-shop.vercel.app");toast("📋 Copy QR link!");}}>📤 Gửi QR</button>
-                <button className="xs" onClick={()=>{
-                  const r=["Bạn ơi đây là hóa đơn xem bài nhé! 🌙
-Bạn chuyển khoản giúp Mitchi với nha 💜"];
-                  navigator.clipboard?.writeText(r[0]);toast("📋 Copy nhắc TT!");
-                }}>💸 Nhắc TT</button>
+                <button className="xs" onClick={()=>{navigator.clipboard?.writeText("Bạn ơi đây là hóa đơn xem bài nhé!\nBạn chuyển khoản giúp Mitchi với nha nha 💜");toast("📋 Copy nhắc TT!");}}>💸 Nhắc TT</button>
                 <button className="xs xs-red" onClick={()=>cancel(b.id)}>✕ Huỷ</button>
               </div>
             )}
