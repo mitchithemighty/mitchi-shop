@@ -2293,7 +2293,7 @@ function SettingsPage({logout, toast, services, setServices, shop, setShop, topi
 
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
-function Dashboard({nav, orders, setOrders, customers, services, bookings, setBookings, toast, shop}) {
+function Dashboard({nav, orders, setOrders, saveOrder, customers, services, bookings, setBookings, toast, shop}) {
   const [fabOpen, setFabOpen] = useState(false);
 
   const todayOrds  = orders.filter(o=>o.date===todayStr());
@@ -2335,12 +2335,12 @@ function Dashboard({nav, orders, setOrders, customers, services, bookings, setBo
   const COLS=[T.green,T.blue,T.yellow,T.green,T.greenlt,T.purple,T.red];
 
   const advanceOrder = id => {
-    setOrders(p=>p.map(o=>{
-      if(o.id!==id) return o;
-      const idx=STATUS_FLOW.indexOf(o.status);
-      if(idx>=STATUS_FLOW.length-2) return o;
-      return {...o,status:STATUS_FLOW[idx+1]};
-    }));
+    const o = orders.find(x=>x.id===id);
+    if(!o) return;
+    const idx = STATUS_FLOW.indexOf(o.status);
+    if(idx>=STATUS_FLOW.length-2) return;
+    const updated = {...o, status:STATUS_FLOW[idx+1]};
+    saveOrder(updated);
     toast("✅ Đã cập nhật trạng thái!");
   };
 
@@ -3016,9 +3016,9 @@ export default function App() {
 
   const pages = {
     dashboard: <Dashboard
-      nav={nav} orders={orders} setOrders={setOrders}
+      nav={nav} orders={orders} setOrders={setOrders} saveOrder={saveOrder}
       customers={customers} services={services}
-      bookings={bookings} setBookings={setBookings}
+      bookings={bookings} setBookings={setBookingsAndSync}
       toast={toast} shop={shop}
     />,
     orders: <OrdersPage
