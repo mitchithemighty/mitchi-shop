@@ -2778,27 +2778,39 @@ export default function App() {
       // Parse JSON fields from Supabase string columns
       setServices(svcs.length ? svcs : []);
       setCustomers(custs.length ? custs : []);
-      setOrders(ords.length ? ords.map(o => ({
+      // Lọc bỏ orders không có custId (phantom orders từ session cũ)
+      const validOrds = ords.filter(o => {
+        const cid = o.custId || o["custId"] || o.custid || o["custid"] || "";
+        return cid && cid.trim() !== "";
+      });
+      setOrders(validOrds.length ? validOrds.map(o => ({
         ...o,
-        custId: o.custId || o["custId"] || "",
+        // Supabase may lowercase quoted column names: custId→custid
+        custId: o.custId || o["custId"] || o.custid || o["custid"] || "",
         items:  (() => { try { return typeof o.items==="string" ? JSON.parse(o.items||"[]") : (o.items||[]); } catch { return []; } })(),
-        extraQ: Number(o.extraQ || 0),
+        extraQ: Number(o.extraQ || o.extraq || 0),
         total:  Number(o.total  || 0),
         tips:   Number(o.tips   || 0),
       })) : []);
-      setBookings(bks.length ? bks : []);
+      setBookings(bks.length ? bks.map(b => ({
+        ...b,
+        custId: b.custId || b.custid || "",
+        svcId:  b.svcId  || b.svcid  || "",
+      })) : []);
       setReplies(reps.length ? reps.map(r => ({
         ...r,
         images: (() => {
           try { return r.images ? JSON.parse(r.images) : []; }
           catch { return []; }
         })(),
-      })) : REPLIES);
+      })) : []);  // Không dùng REPLIES mặc định - tránh auto-sync
       if (settings.length) {
         const s = settings[0];
         if (s.shop)   { try { setShop(JSON.parse(s.shop)); }   catch{} }
         if (s.topics) { try { setTopics(JSON.parse(s.topics)); } catch{} }
       }
+      // Tự động xoá phantom orders khỏi DB
+      await cleanPhantomOrders(ords);
       setDbReady(true);
     } catch(e) {
       console.error("Load error:", e);
@@ -2864,7 +2876,7 @@ export default function App() {
         id: c.id, name: c.name||"", nick: c.nick||"",
         phone: c.phone||"", social: c.social||"",
         tags: c.tags||[], notes: c.notes||"", ava: c.ava||"🌙",
-        created: c.created||"", lastOrder: c.lastOrder||"",
+        created: c.created||"", "lastOrder": c.lastOrder||"",
       }).catch(console.error));
       prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("customers", id).catch(console.error));
       return next;
@@ -2904,11 +2916,15 @@ export default function App() {
     setCustomers(p=>p.map(c=>c.id===o.custId?{...c,lastOrder:o.date}:c));
     try {
       if (!o.id) return;
+      // Không lưu đơn nếu không có custId hợp lệ
+      if (!o.custId || o.custId.trim() === "") { 
+        console.warn("saveOrder: missing custId, skip"); return; 
+      }
       const orderRow = {
         id: o.id,
-        custId: o.custId||null,
+        "custId": o.custId||null,
         items: JSON.stringify(o.items||[]),
-        extraQ: o.extraQ||0,
+        "extraQ": o.extraQ||0,
         total: o.total||0,
         tips: o.tips||0,
         status: o.status||"new",
@@ -2918,7 +2934,7 @@ export default function App() {
       };
       await sb.upsert("orders", orderRow);
       if (o.custId) {
-        await sb.update("customers", o.custId, { lastOrder: o.date });
+        await sb.update("customers", o.custId, { "lastOrder": o.date });
       }
     } catch(e) { console.error("Save order:", e); }
   };
@@ -2926,6 +2942,18 @@ export default function App() {
   const deleteOrder = async (id) => {
     setOrders(p=>p.filter(o=>o.id!==id));
     try { await sb.delete("orders", id); } catch(e) { console.error("Delete order:", e); }
+  };
+
+  // Xoá phantom orders (không có custId) khỏi DB - chạy 1 lần sau khi load
+  const cleanPhantomOrders = async (ords) => {
+    const phantom = ords.filter(o => {
+      const cid = o.custId || o["custId"] || o.custid || "";
+      return !cid || cid.trim() === "";
+    });
+    if (phantom.length === 0) return;
+    console.log(`Cleaning ${phantom.length} phantom orders from DB...`);
+    await Promise.all(phantom.map(o => sb.delete("orders", o.id).catch(console.error)));
+    console.log("Phantom orders cleaned ✅");
   };
 
   const createOrderFor = custId => { setDefCustId(custId); setPage("orders"); };
@@ -2979,10 +3007,10 @@ export default function App() {
       const reps  = normalizeImported("replies", sheet("replies"));
       const st    = sheet("shop_settings")[0];
 
-      if (svcs.length) setServices(prev => [...prev.filter(x=>!svcs.some(y=>y.id===x.id)), ...svcs]);
-      if (custs.length) setCustomers(prev => [...prev.filter(x=>!custs.some(y=>y.id===x.id)), ...custs]);
+      if (svcs.length) setServicesAndSync(prev => [...prev.filter(x=>!svcs.some(y=>y.id===x.id)), ...svcs]);
+      if (custs.length) setCustomersAndSync(prev => [...prev.filter(x=>!custs.some(y=>y.id===x.id)), ...custs]);
       if (ords.length)  setOrders(prev => [...ords, ...prev.filter(x=>!ords.some(y=>y.id===x.id))]);
-      if (bks.length)   setBookings(prev => [...prev.filter(x=>!bks.some(y=>y.id===x.id)), ...bks]);
+      if (bks.length)   setBookingsAndSync(prev => [...prev.filter(x=>!bks.some(y=>y.id===x.id)), ...bks]);
       if (reps.length)  setReplies(prev => [...prev.filter(x=>!reps.some(y=>y.id===x.id)), ...reps]);
       if (st?.shop)   setShop(safeJson(st.shop, shop));
       if (st?.topics) setTopics(safeJson(st.topics, topics));
@@ -3081,3 +3109,4 @@ export default function App() {
     </>
   );
 }
+
