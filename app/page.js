@@ -729,11 +729,16 @@ function OrderDetail({order, customers, services, onUpdate, onDelete, onClose, t
         <div className="card card-blue" style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,padding:12}}>
           <div style={{fontSize:28}}>{cust?.ava||"👤"}</div>
           <div style={{flex:1}}>
-            <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{cust?.name}</div>
+            <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{cust?.name||"(Khách đã xoá)"}</div>
             <div style={{fontSize:12,color:T.muted,marginTop:2}}>{cust?.nick} · {cust?.phone}</div>
           </div>
           <Badge s={order.status}/>
         </div>
+        {!cust&&(
+          <div className="card card-yellow" style={{marginBottom:12,fontSize:12}}>
+            ⚠️ Khách hàng không còn trong hệ thống. Bạn có thể xoá đơn này nếu không cần thiết.
+          </div>
+        )}
 
         {/* Items */}
         <div className="card" style={{marginBottom:12}}>
@@ -1058,7 +1063,7 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
       <div className="hdr">
         <div className="hdr-eye">Danh sách</div>
         <div className="hdr-h1">Khách Hàng</div>
-        <div className="hdr-sub">{customers.length} khách · {customers.filter(c=>isVip(c)).length} VIP · {customers.filter(c=>needsFollowUp(c)).length} cần follow-up</div>
+        <div className="hdr-sub">{customers.filter(c=>orders.some(o=>o.custId===c.id)).length} khách có đơn · {customers.filter(c=>isVip(c)).length} VIP · {customers.filter(c=>needsFollowUp(c)).length} cần follow-up</div>
       </div>
 
       <input className="sb" placeholder="Tìm tên, số điện thoại..." value={search} onChange={e=>setSearch(e.target.value)}/>
@@ -1190,6 +1195,7 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
       ? {...b, date:schedForm.date, time:schedForm.time, status:"pending"}
       : b
     ));
+    // setBookings IS setBookingsAndSync - passed from App
     setScheduleId(null);
     setSchedForm({date:todayStr(),time:""});
     toast("📅 Đã đặt lịch thành công!");
@@ -1730,10 +1736,9 @@ function ReportPage({orders, customers, services}) {
 
   // Repeat customers
   const repeatCusts = customers.filter(c=>orders.filter(o=>o.custId===c.id).length>1);
-  const repeatRate  = customers.length>0?Math.round(repeatCusts.length/customers.length*100):0;
-
-  // Avg spend - chỉ tính khách CÓ ĐƠN (tránh chia cho khách fake)
+  // Chỉ tính khách THẬT (có ít nhất 1 đơn)
   const custsWithOrders = customers.filter(c=>orders.some(o=>o.custId===c.id));
+  const repeatRate  = custsWithOrders.length>0?Math.round(repeatCusts.length/custsWithOrders.length*100):0;
   const avgSpend = custsWithOrders.length>0?Math.round(totalRev/custsWithOrders.length):0;
   const avgTips  = custsWithOrders.length>0?Math.round(totalTips/custsWithOrders.length):0;
 
@@ -2957,16 +2962,14 @@ export default function App() {
     await Promise.all(phantom.map(o => sb.delete("orders", o.id).catch(console.error)));
   };
 
-  // Xoá phantom customers (id dạng "c1","c2" từ seed data cũ)
+  // Xoá phantom customers: khách không có đơn nào
   const cleanPhantomCustomers = async (custs, ords) => {
-    const realOrderCustIds = new Set(ords.map(o=>o.custId||o.custid||"").filter(Boolean));
-    const phantom = custs.filter(c => {
-      // Khách fake: id dạng c1,c2... VÀ không có đơn nào
-      const isOldSeed = /^c\d+$/.test(c.id);
-      const hasOrders = realOrderCustIds.has(c.id);
-      return isOldSeed && !hasOrders;
-    });
-    if (phantom.length === 0) return;
+    const realOrderCustIds = new Set(
+      ords.map(o=>o.custId||o["custId"]||o.custid||"").filter(Boolean)
+    );
+    // Phantom = khách không có đơn nào
+    const phantom = custs.filter(c => !realOrderCustIds.has(c.id));
+    if (phantom.length === 0) { console.log("No phantom customers ✅"); return; }
     console.log(`Cleaning ${phantom.length} phantom customers...`);
     setCustomers(prev => prev.filter(c => !phantom.some(p=>p.id===c.id)));
     await Promise.all(phantom.map(c => sb.delete("customers", c.id).catch(console.error)));
@@ -3010,6 +3013,7 @@ export default function App() {
   const importExcel = async (file) => {
     if (!file) return;
     if (!confirm("Nhập Excel sẽ GỘP/CẬP NHẬT dữ liệu theo id, không xoá dữ liệu hiện tại. Tiếp tục?")) return;
+    if (!confirm("Xác nhận lần 2: Bạn chắc chắn muốn nhập file này?")) return;
     setSyncing(true);
     try {
       const XLSX = await waitForXLSX();
