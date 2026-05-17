@@ -841,7 +841,7 @@ function OrdersPage({orders, setOrders, saveOrder, deleteOrder, customers, servi
   const saveNew = o => { saveOrder(o); setShowNew(false); clearDefaultCust(); toast("✅ Đã tạo đơn! 🐸"); };
   const upd = o => saveOrder(o);
   const selOrder = orders.find(o=>o.id===selId);
-  const cName = id => customers.find(c=>c.id===id)?.name||"?";
+  const cName = id => customers.find(c=>c.id===id)?.name||"(Khách đã xoá)";
   const cAva  = id => customers.find(c=>c.id===id)?.ava||"👤";
   const sName = id => { const s=services.find(x=>x.id===id); return s?`${s.ico} ${s.name}`:"?"; };
 
@@ -1152,7 +1152,7 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
   const waitingBks = bookings.filter(b=>b.status==="waiting");
   const shown = tab==="today"?todayBks : tab==="upcoming"?upcomBks : waitingBks;
 
-  const cName = id => customers.find(c=>c.id===id)?.name||"?";
+  const cName = id => customers.find(c=>c.id===id)?.name||"(Khách đã xoá)";
   const cAva  = id => customers.find(c=>c.id===id)?.ava||"👤";
   const sName = id => { const s=services.find(x=>x.id===id); return s?`${s.ico} ${s.name}`:"Dịch vụ"; };
 
@@ -1732,9 +1732,10 @@ function ReportPage({orders, customers, services}) {
   const repeatCusts = customers.filter(c=>orders.filter(o=>o.custId===c.id).length>1);
   const repeatRate  = customers.length>0?Math.round(repeatCusts.length/customers.length*100):0;
 
-  // Avg spend
-  const avgSpend = customers.length>0?Math.round(totalRev/customers.length):0;
-  const avgTips  = customers.length>0?Math.round(totalTips/customers.length):0;
+  // Avg spend - chỉ tính khách CÓ ĐƠN (tránh chia cho khách fake)
+  const custsWithOrders = customers.filter(c=>orders.some(o=>o.custId===c.id));
+  const avgSpend = custsWithOrders.length>0?Math.round(totalRev/custsWithOrders.length):0;
+  const avgTips  = custsWithOrders.length>0?Math.round(totalTips/custsWithOrders.length):0;
 
   // Service revenue
   const svcStats = services.map(s=>{
@@ -2809,8 +2810,9 @@ export default function App() {
         if (s.shop)   { try { setShop(JSON.parse(s.shop)); }   catch{} }
         if (s.topics) { try { setTopics(JSON.parse(s.topics)); } catch{} }
       }
-      // Tự động xoá phantom orders khỏi DB
+      // Tự động xoá phantom data khỏi DB
       await cleanPhantomOrders(ords);
+      await cleanPhantomCustomers(custs, ords);
       setDbReady(true);
     } catch(e) {
       console.error("Load error:", e);
@@ -2944,16 +2946,31 @@ export default function App() {
     try { await sb.delete("orders", id); } catch(e) { console.error("Delete order:", e); }
   };
 
-  // Xoá phantom orders (không có custId) khỏi DB - chạy 1 lần sau khi load
+  // Xoá phantom orders (không có custId) khỏi DB
   const cleanPhantomOrders = async (ords) => {
     const phantom = ords.filter(o => {
       const cid = o.custId || o["custId"] || o.custid || "";
       return !cid || cid.trim() === "";
     });
     if (phantom.length === 0) return;
-    console.log(`Cleaning ${phantom.length} phantom orders from DB...`);
+    console.log(`Cleaning ${phantom.length} phantom orders...`);
     await Promise.all(phantom.map(o => sb.delete("orders", o.id).catch(console.error)));
-    console.log("Phantom orders cleaned ✅");
+  };
+
+  // Xoá phantom customers (id dạng "c1","c2" từ seed data cũ)
+  const cleanPhantomCustomers = async (custs, ords) => {
+    const realOrderCustIds = new Set(ords.map(o=>o.custId||o.custid||"").filter(Boolean));
+    const phantom = custs.filter(c => {
+      // Khách fake: id dạng c1,c2... VÀ không có đơn nào
+      const isOldSeed = /^c\d+$/.test(c.id);
+      const hasOrders = realOrderCustIds.has(c.id);
+      return isOldSeed && !hasOrders;
+    });
+    if (phantom.length === 0) return;
+    console.log(`Cleaning ${phantom.length} phantom customers...`);
+    setCustomers(prev => prev.filter(c => !phantom.some(p=>p.id===c.id)));
+    await Promise.all(phantom.map(c => sb.delete("customers", c.id).catch(console.error)));
+    console.log("Phantom customers cleaned ✅");
   };
 
   const createOrderFor = custId => { setDefCustId(custId); setPage("orders"); };
@@ -3109,4 +3126,3 @@ export default function App() {
     </>
   );
 }
-
