@@ -1173,7 +1173,8 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
   // Tạo booking thường (có ngày giờ)
   const addBk = () => {
     if(!form.custId||!form.svcId||!form.time){toast("⚠️ Điền đủ khách, dịch vụ và giờ!"); return;}
-    setBookings(p=>[...p,{id:uid(),...form,status:"pending"}]);
+    const newBk = {id:uid(),custId:form.custId,svcId:form.svcId,date:form.date,time:form.time,notes:form.notes,status:"pending"};
+    setBookings(p=>[...p,newBk]);
     setShowNew(false);
     setForm({custId:"",svcId:"",date:todayStr(),time:"",notes:""});
     toast("📅 Đã tạo booking!");
@@ -1182,7 +1183,8 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
   // Tạo booking chờ (chưa có ngày giờ)
   const addWaiting = () => {
     if(!form.custId||!form.svcId){toast("⚠️ Chọn khách và dịch vụ!"); return;}
-    setBookings(p=>[...p,{id:uid(),custId:form.custId,svcId:form.svcId,notes:form.notes,date:"",time:"",status:"waiting"}]);
+    const waitBk = {id:uid(),custId:form.custId,svcId:form.svcId,notes:form.notes,date:"",time:"",status:"waiting"};
+    setBookings(p=>[...p,waitBk]);
     setShowNew(false);
     setForm({custId:"",svcId:"",date:todayStr(),time:"",notes:""});
     toast("⏳ Đã thêm vào danh sách chờ!");
@@ -2274,6 +2276,14 @@ function SettingsPage({logout, toast, services, setServices, shop, setShop, topi
           {ico:"📤",t:"Xuất Excel backup",   s:"Tải toàn bộ khách, đơn, lịch, dịch vụ về máy",                      fn:onExportExcel},
           {ico:"📥",t:"Nhập Excel backup",   s:"Khôi phục/gộp dữ liệu từ file Excel backup",                       fn:onImportExcelClick},
           {ico:"☁️",t:"Sao lưu & đồng bộ", s:"Mở Supabase dashboard để kiểm tra backup cloud",                    fn:()=>window.open('https://supabase.com/dashboard','_blank')},
+          {ico:"🧹",t:"Xoá khách không có đơn", s:`Dọn dẹp khách chưa có đơn nào trong hệ thống`,fn:async()=>{
+            const noOrderCusts=customers.filter(c=>!orders.some(o=>o.custId===c.id));
+            if(noOrderCusts.length===0){toast("✅ Không có khách nào cần xoá!");return;}
+            if(!window.confirm("Xoá "+noOrderCusts.length+" khách chưa có đơn nào?\nBao gồm khách mới thêm hôm nay chưa tạo đơn.\nKhông thể hoàn tác!")) return;
+            setCustomers(p=>p.filter(c=>orders.some(o=>o.custId===c.id)));
+            await Promise.all(noOrderCusts.map(c=>sbFetch("/customers?id=eq."+c.id,{method:"DELETE",prefer:""}).catch(console.error)));
+            toast("🧹 Đã xoá "+noOrderCusts.length+" khách không có đơn!");
+          }},
         ].map(x=>(
           <div key={x.t} className="row" onClick={x.fn}>
             <div style={{fontSize:22,width:36,textAlign:"center",flexShrink:0}}>{x.ico}</div>
@@ -2800,8 +2810,8 @@ export default function App() {
       })) : []);
       setBookings(bks.length ? bks.map(b => ({
         ...b,
-        custId: b.custId || b.custid || "",
-        svcId:  b.svcId  || b.svcid  || "",
+        custId: b.custId || b["custId"] || b.custid || "",
+        svcId:  b.svcId  || b["svcId"]  || b.svcid  || "",
       })) : []);
       setReplies(reps.length ? reps.map(r => ({
         ...r,
@@ -2896,7 +2906,15 @@ export default function App() {
       if (!dbReady) return next;
       const prevIds = prev.map(b=>b.id);
       const nextIds = next.map(b=>b.id);
-      next.forEach(b => sb.upsert("bookings", b).catch(console.error));
+      next.forEach(b => sb.upsert("bookings", {
+        id: b.id,
+        "custId": b.custId||null,
+        "svcId": b.svcId||null,
+        date: b.date||"",
+        time: b.time||"",
+        status: b.status||"pending",
+        notes: b.notes||"",
+      }).catch(console.error));
       prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("bookings", id).catch(console.error));
       return next;
     });
@@ -2967,8 +2985,20 @@ export default function App() {
     const realOrderCustIds = new Set(
       ords.map(o=>o.custId||o["custId"]||o.custid||"").filter(Boolean)
     );
-    // Phantom = khách không có đơn nào
-    const phantom = custs.filter(c => !realOrderCustIds.has(c.id));
+    // Phantom = khách không có đơn nào VÀ tạo > 24h trước
+    // Grace period 24h để tránh xoá khách mới thêm chưa kịp tạo đơn
+    const nowMs = Date.now();
+    const phantom = custs.filter(c => {
+      if (realOrderCustIds.has(c.id)) return false; // có đơn → giữ
+      try {
+        const raw = c.created_at || c.created || "";
+        if (!raw) return true;
+        const d = raw.includes('/')
+          ? (() => { const [day,mon,yr]=raw.split('/').map(Number); return new Date(yr,mon-1,day); })()
+          : new Date(raw);
+        return (nowMs - d.getTime()) > 86400000; // >24h mới xoá
+      } catch { return true; }
+    });
     if (phantom.length === 0) { console.log("No phantom customers ✅"); return; }
     console.log(`Cleaning ${phantom.length} phantom customers...`);
     setCustomers(prev => prev.filter(c => !phantom.some(p=>p.id===c.id)));
@@ -3030,7 +3060,7 @@ export default function App() {
 
       if (svcs.length) setServicesAndSync(prev => [...prev.filter(x=>!svcs.some(y=>y.id===x.id)), ...svcs]);
       if (custs.length) setCustomersAndSync(prev => [...prev.filter(x=>!custs.some(y=>y.id===x.id)), ...custs]);
-      if (ords.length)  setOrders(prev => [...ords, ...prev.filter(x=>!ords.some(y=>y.id===x.id))]);
+      if (ords.length)  { setOrders(prev => [...ords, ...prev.filter(x=>!ords.some(y=>y.id===x.id))]); ords.forEach(x=>sb.upsert("orders",{...x,items:JSON.stringify(x.items||[])}).catch(console.error)); }
       if (bks.length)   setBookingsAndSync(prev => [...prev.filter(x=>!bks.some(y=>y.id===x.id)), ...bks]);
       if (reps.length)  setReplies(prev => [...prev.filter(x=>!reps.some(y=>y.id===x.id)), ...reps]);
       if (st?.shop)   setShop(safeJson(st.shop, shop));
