@@ -1152,7 +1152,7 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
   const [scheduleId,  setScheduleId]  = useState(null); // id booking chờ đang đặt lịch
   const [schedForm,   setSchedForm]   = useState({date:todayStr(),time:""});
 
-  const todayBks   = bookings.filter(b=>b.status!=="waiting"&&b.date===todayStr());
+  const todayBks   = bookings.filter(b=>b.status!=="waiting"&&b.status!=="cancel"&&b.date===todayStr());
   const upcomBks   = bookings.filter(b=>b.status!=="waiting"&&b.date!==todayStr()&&b.status!=="cancel");
   const waitingBks = bookings.filter(b=>b.status==="waiting");
   const shown = tab==="today"?todayBks : tab==="upcoming"?upcomBks : waitingBks;
@@ -1219,7 +1219,7 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
         <div className="hdr-eye">Lịch làm việc</div>
         <div className="hdr-h1">Booking</div>
         <div className="hdr-sub">
-          {todayBks.length} hôm nay · {waitingBks.length} đang chờ lịch
+          {todayBks.length} lịch hôm nay · {waitingBks.length} chờ xếp lịch
         </div>
       </div>
 
@@ -1245,8 +1245,8 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
             Sắp tới ({upcomBks.length})
           </button>
           <button className={`pill ${tab==="waiting"?"on":""}`} onClick={()=>setTab("waiting")}
-            style={waitingBks.length>0&&tab!=="waiting"?{borderColor:T.orange,color:T.orange}:{}}>
-            ⏳ Chờ lịch {waitingBks.length>0?`(${waitingBks.length})`:""}
+            style={waitingBks.length>0&&tab!=="waiting"?{borderColor:"#E65100",color:"#E65100",fontWeight:900}:{}}>
+            ⏳ Chờ lịch{waitingBks.length>0?` (${waitingBks.length})`:""}
           </button>
         </div>
 
@@ -1280,7 +1280,8 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
               b.status==="waiting"?"#FF9800":
               T.yellow
             }`,
-            background:b.status==="cancel"?T.redbg:b.status==="waiting"?"#FFF8E1":T.card,
+            background:b.status==="cancel"?"#FFF0F0":b.status==="waiting"?"#FFF8E1":T.card,
+            opacity:b.status==="cancel"?0.7:1,
             marginBottom:10,
           }}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
@@ -1332,6 +1333,11 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
               </div>
             )}
 
+            {b.status==="cancel"&&(
+              <div style={{display:"flex",gap:6,marginTop:4}}>
+                <button className="xs xs-red" onClick={()=>deleteBk(b.id)}>🗑 Xoá hẳn</button>
+              </div>
+            )}
             {b.status!=="waiting"&&b.status!=="cancel"&&(
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {b.status==="pending"&&(
@@ -2316,7 +2322,7 @@ function Dashboard({nav, orders, setOrders, saveOrder, customers, services, book
   const unpaidOrds = orders.filter(o=>["new","view","done"].includes(o.status));
   const revToday   = todayOrds.filter(o=>o.status==="paid").reduce((s,o)=>s+o.total,0);
   const tipsToday  = todayOrds.reduce((s,o)=>s+(o.tips||0),0);
-  const todayBks   = bookings.filter(b=>b.date===todayStr());
+  const todayBks   = bookings.filter(b=>b.date===todayStr()&&b.status!=="cancel"&&b.status!=="waiting");
   const pendingBks = todayBks.filter(b=>b.status==="pending").length;
 
   const custOrders = id => orders.filter(o=>o.custId===id);
