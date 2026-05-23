@@ -846,7 +846,11 @@ function OrdersPage({orders, setOrders, saveOrder, deleteOrder, customers, servi
   const saveNew = o => { saveOrder(o); setShowNew(false); clearDefaultCust(); toast("✅ Đã tạo đơn! 🐸"); };
   const upd = o => saveOrder(o);
   const selOrder = orders.find(o=>o.id===selId);
-  const cName = id => customers.find(c=>c.id===id)?.name||"(Khách đã xoá)";
+  const cName = id => {
+    if(!id) return "(Chưa có khách)";
+    const c = customers.find(c=>c.id===id);
+    return c?.name || "(Khách đã xoá)";
+  };
   const cAva  = id => customers.find(c=>c.id===id)?.ava||"👤";
   const sName = id => { const s=services.find(x=>x.id===id); return s?`${s.ico} ${s.name}`:"?"; };
 
@@ -1157,7 +1161,11 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
   const waitingBks = bookings.filter(b=>b.status==="waiting");
   const shown = tab==="today"?todayBks : tab==="upcoming"?upcomBks : waitingBks;
 
-  const cName = id => customers.find(c=>c.id===id)?.name||"(Khách đã xoá)";
+  const cName = id => {
+    if(!id) return "(Chưa có khách)";
+    const c = customers.find(c=>c.id===id);
+    return c?.name || "(Khách đã xoá)";
+  };
   const cAva  = id => customers.find(c=>c.id===id)?.ava||"👤";
   const sName = id => { const s=services.find(x=>x.id===id); return s?`${s.ico} ${s.name}`:"Dịch vụ"; };
 
@@ -2283,10 +2291,14 @@ function SettingsPage({logout, toast, services, setServices, shop, setShop, topi
           {ico:"📥",t:"Nhập Excel backup",   s:"Khôi phục/gộp dữ liệu từ file Excel backup",                       fn:onImportExcelClick},
           {ico:"☁️",t:"Sao lưu & đồng bộ", s:"Mở Supabase dashboard để kiểm tra backup cloud",                    fn:()=>window.open('https://supabase.com/dashboard','_blank')},
           {ico:"🧹",t:"Xoá khách không có đơn", s:`Dọn dẹp khách chưa có đơn nào trong hệ thống`,fn:async()=>{
-            const noOrderCusts=customers.filter(c=>!orders.some(o=>o.custId===c.id));
+            // Tìm khách không có đơn - check cả 2 variants của custId
+            const noOrderCusts=customers.filter(c=>
+              !orders.some(o=>(o.custId||o.custid||"")===c.id)
+            );
             if(noOrderCusts.length===0){toast("✅ Không có khách nào cần xoá!");return;}
-            if(!window.confirm("Xoá "+noOrderCusts.length+" khách chưa có đơn nào?\nBao gồm khách mới thêm hôm nay chưa tạo đơn.\nKhông thể hoàn tác!")) return;
-            setCustomers(p=>p.filter(c=>orders.some(o=>o.custId===c.id)));
+            if(!window.confirm("Xoá "+noOrderCusts.length+" khách chưa có đơn nào?\nKiểm tra kỹ trước khi xoá!\nKhông thể hoàn tác!")) return;
+            if(!window.confirm("Xác nhận lần 2: Chắc chắn xoá "+noOrderCusts.length+" khách?")) return;
+            setCustomers(p=>p.filter(c=>orders.some(o=>(o.custId||o.custid||"")===c.id)));
             await Promise.all(noOrderCusts.map(c=>sbFetch("/customers?id=eq."+c.id,{method:"DELETE",prefer:""}).catch(console.error)));
             toast("🧹 Đã xoá "+noOrderCusts.length+" khách không có đơn!");
           }},
@@ -2805,9 +2817,9 @@ export default function App() {
         const cid = o.custId || o["custId"] || o.custid || o["custid"] || "";
         return cid && cid.trim() !== "";
       });
+      // Normalize custId to camelCase after loading
       setOrders(validOrds.length ? validOrds.map(o => ({
         ...o,
-        // Supabase may lowercase quoted column names: custId→custid
         custId: o.custId || o["custId"] || o.custid || o["custid"] || "",
         items:  (() => { try { return typeof o.items==="string" ? JSON.parse(o.items||"[]") : (o.items||[]); } catch { return []; } })(),
         extraQ: Number(o.extraQ || o.extraq || 0),
@@ -2831,9 +2843,10 @@ export default function App() {
         if (s.shop)   { try { setShop(JSON.parse(s.shop)); }   catch{} }
         if (s.topics) { try { setTopics(JSON.parse(s.topics)); } catch{} }
       }
-      // Tự động xoá phantom data khỏi DB
+      // Chỉ xoá phantom ORDERS (không custId) - an toàn
       await cleanPhantomOrders(ords);
-      await cleanPhantomCustomers(custs, ords);
+      // KHÔNG auto-xoá customers vì custId có thể bị lowercase
+      // User dùng nút 🧹 thủ công trong Cài Đặt
       setDbReady(true);
     } catch(e) {
       console.error("Load error:", e);
@@ -2944,7 +2957,8 @@ export default function App() {
       const exists = p.find(x=>x.id===o.id);
       return exists ? p.map(x=>x.id===o.id?o:x) : [o,...p];
     });
-    setCustomers(p=>p.map(c=>c.id===o.custId?{...c,lastOrder:o.date}:c));
+    const cid = o.custId||o.custid||"";
+    if(cid) setCustomers(p=>p.map(c=>c.id===cid?{...c,lastOrder:o.date}:c));
     try {
       if (!o.id) return;
       // Không lưu đơn nếu không có custId hợp lệ
