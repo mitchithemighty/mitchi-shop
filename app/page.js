@@ -75,7 +75,7 @@ async function sbFetch(path, opts) {
 const sb = {
   // SELECT all rows
   getAll: (table, order="created_at.desc") =>
-    sbFetch(`/${table}?order=${order}&limit=1000`),
+    sbFetch(`/${table}?order=${order}&limit=2000`),
 
   // INSERT one row
   insert: (table, row) =>
@@ -2803,7 +2803,7 @@ export default function App() {
     try {
       const [svcs, custs, ords, bks, reps, settings] = await Promise.all([
         sb.getAll("services", "name.asc"),
-        sb.getAll("customers", "created_at.desc"),
+        sbFetch("/customers?order=created_at.desc&limit=2000"),
         sb.getAll("orders", "created_at.desc"),
         sb.getAll("bookings", "date.asc,time.asc"),
         sb.getAll("replies", "created_at.asc"),
