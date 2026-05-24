@@ -353,9 +353,19 @@ const REPLIES = [
   {id:"r5",hash:"#camon",   title:"Cảm ơn",            body:"Cảm ơn bạn đã tin tưởng Mitchi! 💜✨\nMong bài mang năng lượng tích cực cho bạn~",images:[]},
   {id:"r6",hash:"#followup",title:"Follow-up",         body:"Dạo này bạn thế nào rồi? 🌙\nMitchi đang nghĩ đến bạn ~\nNếu có chuyện cần chia sẻ hay xem bài, cứ nhắn Mitchi nha 💜",images:[]},
 ];
+// Helper tìm reply theo hash — tránh crash khi index sai
+const getReplyBody = (hash) => REPLIES.find(r=>r.hash===hash)?.body || "";
 const WEEK_DAYS = ["T2","T3","T4","T5","T6","T7","CN"];
 const WEEK_COLORS = [T.green, T.blue, T.yellow, T.green, "#52B788", T.purple, T.red];
 
+// Dynamic labels 7 ngày gần nhất (index 6 = hôm nay)
+const getLast7Labels = () => {
+  const now = new Date();
+  return Array.from({length:7},(_,i)=>{
+    const d = new Date(now); d.setDate(now.getDate()-(6-i));
+    return d.toLocaleDateString("vi-VN",{weekday:"short"});
+  });
+};
 // ── SEED DATA — intentionally empty, all data comes from Supabase ─────────────
 const SEED_SVCS     = [];
 const SEED_CUSTS    = [];
@@ -403,9 +413,14 @@ function OrderForm({order, customers, services, onSave, onClose, defaultCustId, 
     if (!custId) { setErr("Chọn khách hàng!"); return; }
     if (items.every(it=>!it.svcId)) { setErr("Chọn ít nhất 1 dịch vụ!"); return; }
     setErr("");
+    const cust = customers.find(c=>c.id===custId);
+    const snap = cust
+      ? {name:cust.name,nick:cust.nick||"",phone:cust.phone||"",ava:cust.ava||"🌙"}
+      : (order?.customerSnapshot || null);  // fallback: giữ snapshot cũ nếu khách đã xoá
     onSave({
       id: order?.id || uid(),
       custId, items: items.filter(it=>it.svcId),
+      customerSnapshot: custId!==order?.custId ? snap : (order?.customerSnapshot||snap),
       extraQ: parseInt(extraQ)||0,
       total, tips: order?.tips||0,
       status, notes,
@@ -553,20 +568,21 @@ function InvoiceView({order, cust, services, toast, onClose, shop}) {
   (order.items||[]).forEach(it => {
     const svc = services.find(s=>s.id===it.svcId); if(!svc) return;
     const q = parseInt(it.qty)||0;
+    const grps = it.groups&&it.groups.length ? it.groups : (it.group ? [it.group] : []);
     if (svc.type==="fixed") {
-      rows.push({qty:1, desc:svc.name, unit:svc.price, total:svc.price, group:it.group});
+      rows.push({qty:1, desc:svc.name, unit:svc.price, total:svc.price, groups:grps});
     } else if (q<=5) {
-      rows.push({qty:q, desc:`${svc.name} (trong 5 câu đầu)`, unit:svc.price, total:q*svc.price, group:it.group});
-      rows.push({qty:0, desc:`${svc.name} (từ câu 6 trở đi)`, unit:svc.price6||svc.price, total:0, group:""});
+      rows.push({qty:q, desc:`${svc.name} (trong 5 câu đầu)`, unit:svc.price, total:q*svc.price, groups:grps});
+      rows.push({qty:0, desc:`${svc.name} (từ câu 6 trở đi)`, unit:svc.price6||svc.price, total:0, groups:[]});
     } else {
-      rows.push({qty:5, desc:`${svc.name} (trong 5 câu đầu)`, unit:svc.price, total:5*svc.price, group:it.group});
-      rows.push({qty:q-5, desc:`${svc.name} (từ câu 6 trở đi)`, unit:svc.price6||svc.price, total:(q-5)*(svc.price6||svc.price), group:""});
+      rows.push({qty:5, desc:`${svc.name} (trong 5 câu đầu)`, unit:svc.price, total:5*svc.price, groups:grps});
+      rows.push({qty:q-5, desc:`${svc.name} (từ câu 6 trở đi)`, unit:svc.price6||svc.price, total:(q-5)*(svc.price6||svc.price), groups:[]});
     }
   });
   if (parseInt(order.extraQ)>0) {
     const eq=parseInt(order.extraQ);
-    rows.push({qty:Math.min(eq,5),desc:"Câu lẻ thêm (câu 1–5)",unit:20000,total:Math.min(eq,5)*20000,group:""});
-    if(eq>5) rows.push({qty:eq-5,desc:"Câu lẻ thêm (câu 6+)",unit:15000,total:(eq-5)*15000,group:""});
+    rows.push({qty:Math.min(eq,5),desc:"Câu lẻ thêm (câu 1–5)",unit:20000,total:Math.min(eq,5)*20000,groups:[]});
+    if(eq>5) rows.push({qty:eq-5,desc:"Câu lẻ thêm (câu 6+)",unit:15000,total:(eq-5)*15000,groups:[]});
   }
 
   const copyText = () => {
@@ -612,7 +628,6 @@ function InvoiceView({order, cust, services, toast, onClose, shop}) {
                 <div>
                   <div style={{fontSize:11,fontWeight:600,color:"#fff",lineHeight:1.3}}>{r.desc}</div>
                   {(r.groups||[]).length>0&&<div style={{fontSize:9,color:T.gold,marginTop:2}}>📌 {(r.groups||[]).join(" · ")}</div>}
-                  {r.group&&!(r.groups||[]).length&&<div style={{fontSize:9,color:T.gold,marginTop:2}}>📌 {r.group}</div>}
                 </div>
                 <div style={{fontSize:11,color:"rgba(255,255,255,.6)",fontWeight:600}}>{vnd(r.unit)}</div>
                 <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:12,color:r.total>0?"#fff":"rgba(255,255,255,.3)"}}>{vnd(r.total)}</div>
@@ -672,7 +687,7 @@ function InvoiceView({order, cust, services, toast, onClose, shop}) {
 }
 
 // ── ORDER DETAIL ──────────────────────────────────────────────────────────────
-function OrderDetail({order, customers, services, onUpdate, onDelete, onClose, toast, shop}) {
+function OrderDetail({order, customers, services, onUpdate, onDelete, onClose, toast, shop, topics}) {
   const [tipsInput, setTipsInput] = useState("");
   const [showTips,  setShowTips]  = useState(false);
   const [showInv,   setShowInv]   = useState(false);
@@ -680,6 +695,7 @@ function OrderDetail({order, customers, services, onUpdate, onDelete, onClose, t
   const [confirm,   setConfirm]   = useState(false);
 
   const cust = customers.find(c=>c.id===order.custId);
+  const displayCust = cust || order.customerSnapshot || {name:"Khách không xác định",nick:"",phone:"",ava:"👤"};
 
   const advance = () => {
     const idx = STATUS_FLOW.indexOf(order.status);
@@ -705,11 +721,11 @@ function OrderDetail({order, customers, services, onUpdate, onDelete, onClose, t
     return null;
   };
 
-  if (editing) return <OrderForm order={order} customers={customers} services={services}
+  if (editing) return <OrderForm order={order} customers={customers} services={services} topics={topics}
     onSave={o=>{onUpdate(o);setEditing(false);toast("✅ Đã cập nhật đơn!");}}
     onClose={()=>setEditing(false)}/>;
 
-  if (showInv) return <InvoiceView order={order} cust={cust} services={services} toast={toast} onClose={()=>setShowInv(false)} shop={shop}/>;
+  if (showInv) return <InvoiceView order={order} cust={displayCust} services={services} toast={toast} onClose={()=>setShowInv(false)} shop={shop}/>;
 
   return(
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -719,24 +735,31 @@ function OrderDetail({order, customers, services, onUpdate, onDelete, onClose, t
           <div className="sheet-title" style={{marginBottom:0}}>Chi tiết đơn</div>
           <div style={{display:"flex",gap:6}}>
             <button className="xs" onClick={()=>setEditing(true)}>✏️ Sửa</button>
-            {order.status!=="paid"&&order.status!=="cancel"&&(
-              <button className="xs xs-red" onClick={()=>setConfirm(true)}>🗑</button>
+            {order.status!=="paid"&&(
+              <button className="xs xs-red" onClick={()=>setConfirm(true)}>
+                {order.status==="cancel"?"🗑 Xoá":"🗑 Huỷ/Xoá"}
+              </button>
             )}
           </div>
         </div>
 
         {/* Khách */}
         <div className="card card-blue" style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,padding:12}}>
-          <div style={{fontSize:28}}>{cust?.ava||"👤"}</div>
+          <div style={{fontSize:28}}>{displayCust.ava||"👤"}</div>
           <div style={{flex:1}}>
-            <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{cust?.name||"(Khách đã xoá)"}</div>
-            <div style={{fontSize:12,color:T.muted,marginTop:2}}>{cust?.nick} · {cust?.phone}</div>
+            <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{displayCust.name}</div>
+            <div style={{fontSize:12,color:T.muted,marginTop:2}}>{displayCust.nick}{displayCust.phone?` · ${displayCust.phone}`:""}</div>
           </div>
           <Badge s={order.status}/>
         </div>
-        {!cust&&(
+        {!cust&&order.customerSnapshot&&(
           <div className="card card-yellow" style={{marginBottom:12,fontSize:12}}>
-            ⚠️ Khách hàng không còn trong hệ thống. Bạn có thể xoá đơn này nếu không cần thiết.
+            📷 Hiển thị từ snapshot — khách đã được xoá khỏi danh sách
+          </div>
+        )}
+        {!cust&&!order.customerSnapshot&&(
+          <div className="card card-yellow" style={{marginBottom:12,fontSize:12}}>
+            ⚠️ Không tìm thấy thông tin khách. Có thể xoá đơn này nếu không cần.
           </div>
         )}
 
@@ -808,16 +831,32 @@ function OrderDetail({order, customers, services, onUpdate, onDelete, onClose, t
         {/* Delete confirm */}
         {confirm&&(
           <div className="card card-red" style={{marginTop:12}}>
-            <div style={{fontWeight:800,marginBottom:4,color:T.red}}>⚠️ Xử lý đơn này?</div>
-            <div style={{fontSize:12,color:T.muted,marginBottom:12}}>Huỷ = đổi trạng thái Huỷ · Xoá = xoá vĩnh viễn</div>
-            <div style={{display:"flex",gap:8,marginBottom:8}}>
-              <button className="btn btn-red" style={{flex:1,fontSize:13}} onClick={()=>{onUpdate({...order,status:"cancel"});setConfirm(false);toast("🚫 Đã huỷ đơn!");}}>🚫 Huỷ đơn</button>
-              <button className="btn btn-ghost" style={{flex:1,fontSize:13}} onClick={()=>setConfirm(false)}>Không</button>
-            </div>
-            <button className="btn" style={{width:"100%",background:"#7B0000",color:"#fff",border:"none",borderRadius:12,padding:11,fontFamily:"Nunito",fontWeight:900,fontSize:13,cursor:"pointer"}}
-              onClick={()=>{onDelete(order.id);setConfirm(false);onClose();toast("🗑 Đã xoá đơn vĩnh viễn!");}}>
-              🗑 Xoá vĩnh viễn khỏi hệ thống
-            </button>
+            {order.status==="cancel" ? (
+              <>
+                <div style={{fontWeight:800,marginBottom:4,color:T.red}}>🗑 Đơn đã huỷ — xoá vĩnh viễn?</div>
+                <div style={{fontSize:12,color:T.muted,marginBottom:12}}>Không thể hoàn tác sau khi xoá</div>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="btn" style={{flex:2,background:"#7B0000",color:"#fff",border:"none",borderRadius:12,padding:11,fontFamily:"Nunito",fontWeight:900,fontSize:13,cursor:"pointer"}}
+                    onClick={()=>{onDelete(order.id);setConfirm(false);onClose();toast("🗑 Đã xoá đơn!");}}>
+                    🗑 Xoá vĩnh viễn
+                  </button>
+                  <button className="btn btn-ghost" style={{flex:1,fontSize:13}} onClick={()=>setConfirm(false)}>Giữ lại</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{fontWeight:800,marginBottom:4,color:T.red}}>⚠️ Xử lý đơn này?</div>
+                <div style={{fontSize:12,color:T.muted,marginBottom:12}}>Huỷ = đổi trạng thái · Xoá = xoá vĩnh viễn</div>
+                <div style={{display:"flex",gap:8,marginBottom:8}}>
+                  <button className="btn btn-red" style={{flex:1,fontSize:13}} onClick={()=>{onUpdate({...order,status:"cancel"});setConfirm(false);toast("🚫 Đã huỷ đơn!");}}>🚫 Huỷ đơn</button>
+                  <button className="btn btn-ghost" style={{flex:1,fontSize:13}} onClick={()=>setConfirm(false)}>Không</button>
+                </div>
+                <button className="btn" style={{width:"100%",background:"#7B0000",color:"#fff",border:"none",borderRadius:12,padding:11,fontFamily:"Nunito",fontWeight:900,fontSize:13,cursor:"pointer"}}
+                  onClick={()=>{onDelete(order.id);setConfirm(false);onClose();toast("🗑 Đã xoá đơn vĩnh viễn!");}}>
+                  🗑 Xoá vĩnh viễn khỏi hệ thống
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -826,19 +865,22 @@ function OrderDetail({order, customers, services, onUpdate, onDelete, onClose, t
 }
 
 // ── ORDERS PAGE ───────────────────────────────────────────────────────────────
-function OrdersPage({orders, setOrders, saveOrder, deleteOrder, customers, services, toast, defaultCustId, clearDefaultCust, shop, topics, setTopics}) {
+function OrdersPage({orders, setOrders, saveOrder, deleteOrder, customers, services, toast, defaultCustId, clearDefaultCust, shop, topics, setTopics, highlightOrder, clearHighlight}) {
   const [filter,   setFilter]   = useState("all");
   const [showNew,  setShowNew]  = useState(!!defaultCustId);
   const [selId,    setSelId]    = useState(null);
   const [search,   setSearch]   = useState("");
+  // Mở đơn được chỉ định từ trang khác (booking → xem đơn)
+  useEffect(()=>{ if(highlightOrder){ setSelId(highlightOrder); clearHighlight&&clearHighlight(); } }, [highlightOrder]);
 
   useEffect(()=>{ if(defaultCustId) setShowNew(true); },[defaultCustId]);
 
   const shown = orders.filter(o=>{
     if (filter!=="all"&&o.status!==filter) return false;
     if (search) {
-      const c = customers.find(x=>x.id===o.custId);
-      return c?.name.toLowerCase().includes(search.toLowerCase())||c?.nick.toLowerCase().includes(search.toLowerCase());
+      const c = customers.find(x=>x.id===o.custId) || o.customerSnapshot;
+      const q = search.toLowerCase();
+      return (c?.name||"").toLowerCase().includes(q)||(c?.nick||"").toLowerCase().includes(q)||(c?.phone||"").toLowerCase().includes(q);
     }
     return true;
   });
@@ -846,10 +888,14 @@ function OrdersPage({orders, setOrders, saveOrder, deleteOrder, customers, servi
   const saveNew = o => { saveOrder(o); setShowNew(false); clearDefaultCust(); toast("✅ Đã tạo đơn! 🐸"); };
   const upd = o => saveOrder(o);
   const selOrder = orders.find(o=>o.id===selId);
-  const cName = id => {
-    if(!id) return "(Chưa có khách)";
+  const cName = (id, snap) => {
+    if(!id) return snap?.name || "(Chưa có khách)";
     const c = customers.find(c=>c.id===id);
-    return c?.name || "(Khách đã xoá)";
+    return c?.name || snap?.name || "(Khách đã xoá)";
+  };
+  const cAva2 = (id, snap) => {
+    const c = customers.find(c=>c.id===id);
+    return c?.ava || snap?.ava || "👤";
   };
   const cAva  = id => customers.find(c=>c.id===id)?.ava||"👤";
   const sName = id => { const s=services.find(x=>x.id===id); return s?`${s.ico} ${s.name}`:"?"; };
@@ -875,9 +921,9 @@ function OrdersPage({orders, setOrders, saveOrder, deleteOrder, customers, servi
 
         {shown.map(o=>(
           <div key={o.id} className="row" onClick={()=>setSelId(o.id)} style={{borderLeft:`3px solid ${o.status==="paid"?T.green:o.status==="cancel"?T.red:o.status==="done"?T.yellow:o.status==="view"?T.purple:T.blue}`}}>
-            <div className="ava" style={{borderRadius:"50%",fontSize:20}}>{cAva(o.custId)}</div>
+            <div className="ava" style={{borderRadius:"50%",fontSize:20}}>{cAva2(o.custId, o.customerSnapshot)}</div>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:14,fontWeight:700}}>{cName(o.custId)}</div>
+              <div style={{fontSize:14,fontWeight:700}}>{cName(o.custId, o.customerSnapshot)}</div>
               <div style={{fontSize:11,color:T.muted,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
                 {o.items.map(it=>sName(it.svcId)).join(" + ")}{o.extraQ>0?` + ${o.extraQ}c lẻ`:""}
               </div>
@@ -895,13 +941,13 @@ function OrdersPage({orders, setOrders, saveOrder, deleteOrder, customers, servi
       <button className="fab" onClick={()=>setShowNew(true)}>{I.plus}</button>
 
       {showNew&&<OrderForm customers={customers} services={services} onSave={saveNew} onClose={()=>{setShowNew(false);clearDefaultCust();}} defaultCustId={defaultCustId} topics={topics}/>}
-      {selId&&selOrder&&<OrderDetail order={selOrder} customers={customers} services={services} onUpdate={upd} onDelete={id=>{deleteOrder(id);setSelId(null);}} onClose={()=>setSelId(null)} toast={toast} shop={shop}/>}
+      {selId&&selOrder&&<OrderDetail order={selOrder} customers={customers} services={services} onUpdate={upd} onDelete={id=>{deleteOrder(id);setSelId(null);}} onClose={()=>setSelId(null)} toast={toast} shop={shop} topics={topics}/>}
     </div>
   );
 }
 
 // ── CUSTOMERS PAGE ────────────────────────────────────────────────────────────
-function CustomersPage({customers, setCustomers, orders, services, toast, onCreateOrder}) {
+function CustomersPage({customers, setCustomers, orders, setOrders, bookings, setBookings, services, toast, onCreateOrder}) {
   const [sel,     setSel]     = useState(null);
   const [modal,   setModal]   = useState(false);
   const [editC,   setEditC]   = useState(null);
@@ -911,9 +957,19 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
   const [form,    setForm]    = useState({name:"",nick:"",phone:"",social:"",notes:"",ava:"🌙",created:todayStr()});
 
   const custOrders = id => orders.filter(o=>o.custId===id);
+  // Lấy ngày đơn mới nhất (không huỷ) từ orders thật
+  const getLatestOrdDate = id => {
+    const valid = orders.filter(o=>o.custId===id&&o.status!=="cancel"&&o.date);
+    if(!valid.length) return "";
+    return valid.sort((a,b)=>{
+      const parse = s=>{ const [d,m,y]=s.split("/").map(Number); return new Date(y,m-1,d).getTime(); };
+      return parse(b.date)-parse(a.date);
+    })[0].date;
+  };
   const totalSpent = id => custOrders(id).filter(o=>o.status==="paid").reduce((s,o)=>s+o.total,0);
   const totalTips  = id => custOrders(id).reduce((s,o)=>s+(o.tips||0),0);
-  const lastOrder  = id => { const ords=custOrders(id); return ords.length?ords[ords.length-1].date:"-"; };
+  const parseDate = s => { if(!s||!s.includes("/")) return 0; const [d,m,y]=s.split("/").map(Number); return new Date(y,m-1,d).getTime(); };
+  const lastOrder = id => { const valid=custOrders(id).filter(o=>o.status!=="cancel"&&o.date); if(!valid.length) return "-"; return valid.sort((a,b)=>parseDate(b.date)-parseDate(a.date))[0].date; };
   const daysSince  = dateStr => {
     if(!dateStr||dateStr==="-") return 999;
     const [d,m,y]=dateStr.split("/").map(Number);
@@ -921,7 +977,7 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
     return Math.floor(diff/(1000*60*60*24));
   };
 
-  const needsFollowUp = c => daysSince(c.lastOrder||lastOrder(c.id)) > 21 && custOrders(c.id).length > 0;
+  const needsFollowUp = c => daysSince(lastOrder(c.id)) > 21 && custOrders(c.id).some(o=>o.status!=="cancel");
   const isVip = c => totalSpent(c.id)>500000||custOrders(c.id).length>=5||totalTips(c.id)>100000;
   const autoTags = c => {
     const tags=[...(c.tags||[]).filter(t=>!["vip","tip"].includes(t))];
@@ -935,7 +991,7 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
   const openEdit = c => { setForm({name:c.name,nick:c.nick||"",phone:c.phone||"",social:c.social||"",notes:c.notes||"",ava:c.ava||"🌙",created:c.created||todayStr()}); setEditC(c); setModal(true); };
 
   const save = () => {
-    if(!form.name.trim()) return;
+    if(!form.name.trim()) { toast("⚠️ Nhập tên khách!"); return; }
     if(editC) {
       setCustomers(p=>p.map(c=>c.id===editC.id?{...c,...form}:c));
       toast("✅ Đã cập nhật!");
@@ -947,12 +1003,80 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
     setModal(false);
   };
 
-  const del = id => { setCustomers(p=>p.filter(c=>c.id!==id)); setSel(null); setDelConf(false); toast("🗑 Đã xoá!"); };
+  const [actionSheet, setActionSheet] = useState(null); // customer đang xử lý
+
+  const handleCustAction = async (choice) => {
+    const c = actionSheet;
+    if(!c) return;
+    const snap = {name:c.name,nick:c.nick||"",phone:c.phone||"",ava:c.ava||"🌙"};
+    const custOrds = orders.filter(o=>o.custId===c.id);
+
+    if(choice===1) {
+      // Lưu trữ
+      setCustomers(p=>p.map(x=>x.id===c.id?{...x,archived:true}:x));
+      try { await sbFetch("/customers?id=eq."+c.id,{method:"PATCH",body:JSON.stringify({archived:true}),prefer:""}); } catch(e){console.error(e);}
+      toast("📦 Đã lưu trữ khách!");
+    } else if(choice===2) {
+      // Xoá khách, giữ đơn + booking có snapshot — Supabase TRƯỚC, local SAU
+      const custBks = bookings.filter(b=>b.custId===c.id);
+      if(!window.confirm("Xoá khách nhưng giữ lại "+custOrds.length+" đơn và "+custBks.length+" booking?\nĐơn/booking sẽ hiển thị tên từ snapshot.")) return;
+      try {
+        // Bước 1: Update snapshot trên Supabase
+        await Promise.all([
+          ...custOrds.map(o=>sbFetch("/orders?id=eq."+o.id,{method:"PATCH",body:JSON.stringify({customerSnapshot:snap}),prefer:""})),
+          ...custBks.map(b=>sbFetch("/bookings?id=eq."+b.id,{method:"PATCH",body:JSON.stringify({customerSnapshot:snap}),prefer:""})),
+        ]);
+        // Bước 2: Xoá customer trên Supabase
+        await sbFetch("/customers?id=eq."+c.id,{method:"DELETE",prefer:""});
+        // Bước 3: Chỉ khi DB thành công mới update local state
+        setOrders(p=>p.map(o=>o.custId===c.id?{...o,customerSnapshot:snap}:o));
+        setBookings(p=>p.map(b=>b.custId===c.id?{...b,customerSnapshot:snap}:b));
+        setCustomers(p=>p.filter(x=>x.id!==c.id));
+        toast("🗑 Đã xoá khách, giữ lại đơn và booking!");
+      } catch(e) {
+        console.error(e);
+        toast("⚠️ Không xoá được — snapshot chưa lưu thành công. Thử lại!");
+        return;
+      }
+    } else if(choice===3) {
+      if(!window.confirm("XOÁ TOÀN BỘ: khách + "+custOrds.length+" đơn + booking?\nKHÔNG THỂ HOÀN TÁC!")) return;
+      if(!window.confirm("Xác nhận lần 2: Chắc chắn xoá hết?")) return;
+      // DB trước, local sau — tránh mất data nếu Supabase fail
+      try {
+        await Promise.all([
+          ...custOrds.map(o=>sbFetch("/orders?id=eq."+o.id,{method:"DELETE",prefer:""})),
+          sbFetch("/bookings?custId=eq."+c.id,{method:"DELETE",prefer:""}),
+          sbFetch("/customers?id=eq."+c.id,{method:"DELETE",prefer:""}),
+        ]);
+        // Chỉ update local khi DB thành công
+        setCustomers(p=>p.filter(x=>x.id!==c.id));
+        setOrders(p=>p.filter(o=>o.custId!==c.id));
+        setBookings(p=>p.filter(b=>b.custId!==c.id));
+        toast("💣 Đã xoá toàn bộ!");
+      } catch(e) {
+        console.error(e);
+        toast("⚠️ Xoá thất bại — dữ liệu chưa bị thay đổi. Thử lại!");
+        return;
+      }
+    }
+    setActionSheet(null);
+    setSel(null);
+    setDelConf(false);
+  };
+
+  const restoreCust = async (c) => {
+    setCustomers(p=>p.map(x=>x.id===c.id?{...x,archived:false}:x));
+    try { await sbFetch("/customers?id=eq."+c.id,{method:"PATCH",body:JSON.stringify({archived:false}),prefer:""}); } catch(e){console.error(e);}
+    toast("✅ Đã khôi phục khách!");
+  };
 
   const filtered = customers.filter(c=>{
+    if(tab==="archived") return c.archived===true;
+    if(c.archived) return false; // ẩn khách lưu trữ khỏi các tab khác
     if(tab==="vip"&&!isVip(c)) return false;
     if(tab==="fu"&&!needsFollowUp(c)) return false;
     if(tab==="new"&&!c.tags?.includes("new")) return false;
+    if(tab==="noorder"&&orders.some(o=>o.custId===c.id)) return false;
     if(search&&!c.name.toLowerCase().includes(search.toLowerCase())&&!c.nick?.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
@@ -962,7 +1086,7 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
     if(!c) { setSel(null); return null; }
     const co=custOrders(c.id);
     const tags=autoTags(c);
-    const ds=daysSince(c.lastOrder||lastOrder(c.id));
+    const ds=daysSince(lastOrder(c.id));
     return(
       <div className="scroll-body">
         <div className="hdr" style={{paddingTop:44}}>
@@ -1013,14 +1137,15 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
 
           {/* Action buttons */}
           <div style={{display:"flex",gap:8,marginBottom:14}}>
-            <button className="btn btn-green" style={{flex:1}} onClick={()=>{setSel(null);onCreateOrder(c.id);}}>📋 Tạo đơn</button>
-            <button className="btn btn-outline" style={{flex:1}} onClick={()=>openEdit(c)}>✏️ Sửa</button>
+            {!c.archived&&<button className="btn btn-green" style={{flex:1}} onClick={()=>{setSel(null);onCreateOrder(c.id);}}>📋 Tạo đơn</button>}
+            {!c.archived&&<button className="btn btn-outline" style={{flex:1}} onClick={()=>openEdit(c)}>✏️ Sửa</button>}
+            {c.archived&&<button className="btn btn-green" style={{flex:1}} onClick={()=>restoreCust(c)}>♻️ Khôi phục</button>}
           </div>
 
           {needsFollowUp(c)&&(
             <div className="action-card action-card-yellow" style={{marginBottom:14}}>
               <div style={{fontWeight:700,marginBottom:8}}>⚠️ {ds} ngày chưa quay lại — nên follow-up!</div>
-              <button className="xs xs-yellow" onClick={()=>{navigator.clipboard?.writeText(REPLIES[6].body);toast("📋 Copy tin follow-up!");}}>📋 Copy tin follow-up</button>
+              <button className="xs xs-yellow" onClick={()=>{navigator.clipboard?.writeText(getReplyBody("#followup"));toast("📋 Copy tin follow-up!");}}>📋 Copy tin follow-up</button>
             </div>
           )}
 
@@ -1045,12 +1170,12 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
           ))}
 
           <div style={{height:16}}/>
-          <button className="btn btn-ghost" style={{color:T.red,borderColor:T.red}} onClick={()=>setDelConf(true)}>🗑 Xoá khách hàng</button>
+          <button className="btn btn-ghost" style={{color:T.red,borderColor:T.red}} onClick={()=>setActionSheet(c)}>⚙️ Xử lý khách</button>
           {delConf&&(
             <div className="card card-red" style={{marginTop:10}}>
-              <div style={{fontWeight:700,color:T.red,marginBottom:10}}>Xoá "{c.name}"? Không thể hoàn tác!</div>
+              <div style={{fontWeight:700,color:T.red,marginBottom:10}}>Xử lý khách "{c.name}"?</div>
               <div style={{display:"flex",gap:8}}>
-                <button className="btn btn-red" style={{flex:1}} onClick={()=>del(c.id)}>Xoá</button>
+                <button className="btn btn-red" style={{flex:1,fontSize:12}} onClick={()=>{setDelConf(false);setActionSheet(c);}}>⚙️ Xử lý</button>
                 <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setDelConf(false)}>Huỷ</button>
               </div>
             </div>
@@ -1074,7 +1199,7 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
 
       <div className="sec" style={{paddingTop:10}}>
         <div className="pill-row">
-          {[{k:"all",l:"Tất cả"},{k:"vip",l:"👑 VIP"},{k:"fu",l:"📌 Follow-up"},{k:"new",l:"✨ Mới"}].map(x=>(
+          {[{k:"all",l:"Tất cả"},{k:"vip",l:"👑 VIP"},{k:"fu",l:"📌 Follow-up"},{k:"new",l:"✨ Mới"},{k:"noorder",l:"🔵 Chưa có đơn"},{k:"archived",l:"📦 Lưu trữ"}].map(x=>(
             <button key={x.k} className={`pill ${tab===x.k?"on":""}`} onClick={()=>setTab(x.k)}>{x.l}</button>
           ))}
         </div>
@@ -1111,6 +1236,35 @@ function CustomersPage({customers, setCustomers, orders, services, toast, onCrea
 
       <button className="fab" onClick={openNew}>{I.plus}</button>
       {modal&&<CustomerModal form={form} setForm={setForm} onSave={save} onClose={()=>setModal(false)} isEdit={!!editC}/>}
+
+      {/* Action sheet xử lý khách */}
+      {actionSheet&&(
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setActionSheet(null)}>
+          <div className="sheet">
+            <DragHandle/>
+            <div className="sheet-title">⚙️ Xử lý khách</div>
+            <div className="card card-blue" style={{display:"flex",gap:12,alignItems:"center",marginBottom:16}}>
+              <div style={{fontSize:28}}>{actionSheet.ava||"🌙"}</div>
+              <div>
+                <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{actionSheet.name}</div>
+                <div style={{fontSize:12,color:T.muted}}>{orders.filter(o=>o.custId===actionSheet.id).length} đơn liên quan</div>
+              </div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              <button className="btn btn-ghost" style={{textAlign:"left",padding:14}} onClick={()=>handleCustAction(1)}>
+                📦 <strong>Lưu trữ</strong> — ẩn khỏi danh sách, giữ toàn bộ đơn
+              </button>
+              <button className="btn btn-ghost" style={{textAlign:"left",padding:14,borderColor:T.red,color:T.red}} onClick={()=>handleCustAction(2)}>
+                🗑 <strong>Xoá khách, giữ đơn</strong> — đơn vẫn hiện tên từ snapshot
+              </button>
+              <button className="btn" style={{textAlign:"left",padding:14,background:"#7B0000",color:"#fff",borderRadius:12,border:"none",fontFamily:"Nunito",fontWeight:700,cursor:"pointer",fontSize:14}} onClick={()=>handleCustAction(3)}>
+                💣 <strong>Xoá toàn bộ</strong> — khách + đơn + booking liên quan
+              </button>
+              <button className="btn btn-ghost" onClick={()=>setActionSheet(null)}>Huỷ</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1148,7 +1302,7 @@ function CustomerModal({form, setForm, onSave, onClose, isEdit}) {
 }
 
 // ── BOOKING PAGE ──────────────────────────────────────────────────────────────
-function BookingPage({bookings, setBookings, customers, services, orders, setOrders, saveOrder, toast}) {
+function BookingPage({bookings, setBookings, customers, services, orders, setOrders, saveOrder, toast, onSelectOrder}) {
   const [showNew,     setShowNew]     = useState(false);
   const [newType,     setNewType]     = useState("booking"); // "booking" | "waiting"
   const [tab,         setTab]         = useState("today");
@@ -1156,10 +1310,12 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
   const [scheduleId,  setScheduleId]  = useState(null); // id booking chờ đang đặt lịch
   const [schedForm,   setSchedForm]   = useState({date:todayStr(),time:""});
 
-  const todayBks   = bookings.filter(b=>b.status!=="waiting"&&b.status!=="cancel"&&b.date===todayStr());
-  const upcomBks   = bookings.filter(b=>b.status!=="waiting"&&b.date!==todayStr()&&b.status!=="cancel");
-  const waitingBks = bookings.filter(b=>b.status==="waiting");
-  const shown = tab==="today"?todayBks : tab==="upcoming"?upcomBks : waitingBks;
+  const todayBks    = bookings.filter(b=>!["waiting","cancel","converted"].includes(b.status)&&b.date===todayStr());
+  const upcomBks    = bookings.filter(b=>!["waiting","cancel","converted"].includes(b.status)&&b.date!==todayStr());
+  const waitingBks  = bookings.filter(b=>b.status==="waiting");
+  const convertedBks= bookings.filter(b=>b.status==="converted");
+  const cancelBks   = bookings.filter(b=>b.status==="cancel");
+  const shown = tab==="today"?todayBks : tab==="upcoming"?upcomBks : tab==="waiting"?waitingBks : tab==="converted"?convertedBks : cancelBks;
 
   const cName = id => {
     if(!id) return "(Chưa có khách)";
@@ -1168,6 +1324,7 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
   };
   const cAva  = id => customers.find(c=>c.id===id)?.ava||"👤";
   const sName = id => { const s=services.find(x=>x.id===id); return s?`${s.ico} ${s.name}`:"Dịch vụ"; };
+  const getBkCust = b => customers.find(c=>c.id===b.custId) || b.customerSnapshot || {name:"Khách không xác định",nick:"",phone:"",ava:"👤"};
 
   const today2 = new Date().getDate();
   const fd  = new Date(new Date().getFullYear(),new Date().getMonth(),1).getDay();
@@ -1181,7 +1338,9 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
   // Tạo booking thường (có ngày giờ)
   const addBk = () => {
     if(!form.custId||!form.svcId||!form.time){toast("⚠️ Điền đủ khách, dịch vụ và giờ!"); return;}
-    const newBk = {id:uid(),custId:form.custId,svcId:form.svcId,date:form.date,time:form.time,notes:form.notes,status:"pending"};
+    const bkCust = customers.find(c=>c.id===form.custId);
+    const bkSnap = bkCust ? {name:bkCust.name,nick:bkCust.nick||"",phone:bkCust.phone||"",ava:bkCust.ava||"🌙"} : null;
+    const newBk = {id:uid(),custId:form.custId,customerSnapshot:bkSnap,svcId:form.svcId,date:form.date,time:form.time,notes:form.notes,status:"pending"};
     setBookings(p=>[...p,newBk]);
     setShowNew(false);
     setForm({custId:"",svcId:"",date:todayStr(),time:"",notes:""});
@@ -1191,7 +1350,9 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
   // Tạo booking chờ (chưa có ngày giờ)
   const addWaiting = () => {
     if(!form.custId||!form.svcId){toast("⚠️ Chọn khách và dịch vụ!"); return;}
-    const waitBk = {id:uid(),custId:form.custId,svcId:form.svcId,notes:form.notes,date:"",time:"",status:"waiting"};
+    const wCust = customers.find(c=>c.id===form.custId);
+    const wSnap = wCust ? {name:wCust.name,nick:wCust.nick||"",phone:wCust.phone||"",ava:wCust.ava||"🌙"} : null;
+    const waitBk = {id:uid(),custId:form.custId,customerSnapshot:wSnap,svcId:form.svcId,notes:form.notes,date:"",time:"",status:"waiting"};
     setBookings(p=>[...p,waitBk]);
     setShowNew(false);
     setForm({custId:"",svcId:"",date:todayStr(),time:"",notes:""});
@@ -1211,14 +1372,59 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
     toast("📅 Đã đặt lịch thành công!");
   };
 
-  const confirm = id => { setBookings(p=>p.map(b=>b.id===id?{...b,status:"confirmed"}:b)); toast("✅ Đã xác nhận!"); };
-  const cancel  = id => { setBookings(p=>p.map(b=>b.id===id?{...b,status:"cancel"}:b)); toast("🗑 Đã huỷ!"); };
-  const deleteBk = id => { setBookings(p=>p.filter(b=>b.id!==id)); toast("🗑 Đã xoá!"); };
+  const confirm = id => {
+    setBookings(p=>p.map(b=>b.id===id?{...b,status:"confirmed"}:b));
+    sbFetch("/bookings?id=eq."+id,{method:"PATCH",body:JSON.stringify({status:"confirmed"}),prefer:""}).catch(console.error);
+    toast("✅ Đã xác nhận!");
+  };
+  const cancel  = id => {
+    setBookings(p=>p.map(b=>b.id===id?{...b,status:"cancel"}:b));
+    sbFetch("/bookings?id=eq."+id,{method:"PATCH",body:JSON.stringify({status:"cancel"}),prefer:""}).catch(console.error);
+    toast("🗑 Đã huỷ!");
+  };
+  const deleteBk = async id => {
+    try {
+      await sb.delete("bookings", id);
+      setBookings(p=>p.filter(b=>b.id!==id));
+      toast("🗑 Đã xoá booking!");
+    } catch(e) {
+      console.error(e);
+      toast("⚠️ Không xoá được. Thử lại!");
+    }
+  };
+
+  const [bkToOrder, setBkToOrder] = useState(null); // booking đang chờ tạo đơn
+  const [bkQty, setBkQty] = useState("");
 
   const createOrderFromBk = bk => {
-    const o={id:uid(),custId:bk.custId,items:[{svcId:bk.svcId,qty:"",group:""}],extraQ:0,total:0,tips:0,status:"new",date:todayStr(),time:nowStr(),notes:bk.notes||""};
-    saveOrder(o);
-    toast("📋 Đã tạo đơn từ booking!");
+    if(bk.orderId) { toast("⚠️ Booking này đã tạo đơn rồi!"); return; }
+    const svc = services.find(s=>s.id===bk.svcId);
+    const cust = customers.find(c=>c.id===bk.custId);
+    const snap = cust
+      ? {name:cust.name,nick:cust.nick||"",phone:cust.phone||"",ava:cust.ava||"🌙"}
+      : (bk.customerSnapshot || null);  // fallback snapshot nếu khách đã xoá
+    if(svc?.type==="fixed") {
+      const newOrd = {id:uid(),custId:bk.custId,customerSnapshot:snap,items:[{svcId:bk.svcId,qty:1,groups:[]}],extraQ:0,total:svc.price||0,tips:0,status:"new",date:todayStr(),time:nowStr(),notes:bk.notes||""};
+      saveOrder(newOrd);
+      setBookings(p=>p.map(b=>b.id===bk.id?{...b,orderId:newOrd.id,status:"converted"}:b));
+      toast("📋 Đã tạo đơn "+vnd(svc.price||0)+"!");
+    } else {
+      setBkToOrder({...bk, _svc:svc, _snap:snap});
+      setBkQty("");
+    }
+  };
+
+  const confirmBkOrder = () => {
+    const bk = bkToOrder;
+    const svc = bk._svc;
+    const qty = Number(bkQty);
+    if(!qty||qty<=0) { toast("⚠️ Nhập số câu hợp lệ!"); return; }
+    const total = calcQ(qty, svc?.price||0, svc?.price6||svc?.price||0);
+    const newOrd = {id:uid(),custId:bk.custId,customerSnapshot:bk._snap,items:[{svcId:bk.svcId,qty,groups:[]}],extraQ:0,total,tips:0,status:"new",date:todayStr(),time:nowStr(),notes:bk.notes||""};
+    saveOrder(newOrd);
+    setBookings(p=>p.map(b=>b.id===bk.id?{...b,orderId:newOrd.id,status:"converted"}:b));
+    setBkToOrder(null);
+    toast("📋 Đã tạo đơn "+qty+" câu = "+vnd(total)+"!");
   };
 
   return(
@@ -1256,6 +1462,16 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
             style={waitingBks.length>0&&tab!=="waiting"?{borderColor:"#E65100",color:"#E65100",fontWeight:900}:{}}>
             ⏳ Chờ lịch{waitingBks.length>0?` (${waitingBks.length})`:""}
           </button>
+          {convertedBks.length>0&&(
+            <button className={`pill ${tab==="converted"?"on":""}`} onClick={()=>setTab("converted")}>
+              ✅ Đã tạo đơn ({convertedBks.length})
+            </button>
+          )}
+          {cancelBks.length>0&&(
+            <button className={`pill ${tab==="cancel"?"on":""}`} onClick={()=>setTab("cancel")}>
+              🚫 Đã huỷ ({cancelBks.length})
+            </button>
+          )}
         </div>
 
         {/* Waiting list header info */}
@@ -1293,12 +1509,12 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
             marginBottom:10,
           }}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-              <div style={{fontSize:24}}>{cAva(b.custId)}</div>
+              <div style={{fontSize:24}}>{getBkCust(b).ava||"👤"}</div>
               <div style={{flex:1}}>
                 <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>
                   {b.status==="waiting"
-                    ? cName(b.custId)
-                    : `${b.time} · ${cName(b.custId)}`
+                    ? getBkCust(b).name
+                    : `${b.time} · ${getBkCust(b).name}`
                   }
                 </div>
                 <div style={{fontSize:12,color:T.muted}}>
@@ -1322,6 +1538,7 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
                 {b.status==="confirmed"?"XÁC NHẬN":
                  b.status==="cancel"?"ĐÃ HUỶ":
                  b.status==="waiting"?"CHỜ LỊCH":
+                 b.status==="converted"?"ĐÃ TẠO ĐƠN":
                  "CHỜ XÁC NHẬN"}
               </span>
             </div>
@@ -1333,11 +1550,15 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
                   onClick={()=>{setScheduleId(b.id);setSchedForm({date:todayStr(),time:""});}}>
                   📅 Đặt lịch
                 </button>
-                <button className="xs xs-green" onClick={()=>createOrderFromBk(b)}>📋 Tạo đơn</button>
+                {b.orderId ? (
+                  <button className="xs" disabled style={{opacity:.5}}>✅ Đã tạo đơn</button>
+                ) : (
+                  <button className="xs xs-green" onClick={()=>createOrderFromBk(b)}>📋 Tạo đơn</button>
+                )}
                 <button className="xs" onClick={()=>{navigator.clipboard?.writeText(`Bạn ơi Mitchi đã có lịch trống rồi nha! Bạn muốn đặt ngày nào thì nhắn Mitchi nhé 🐸`);toast("📋 Đã copy tin báo lịch!");}}>
                   💬 Báo có lịch
                 </button>
-                <button className="xs xs-red" onClick={()=>deleteBk(b.id)}>🗑 Xoá</button>
+                <button className="xs xs-red" onClick={()=>{if(window.confirm("Chỉ xoá booking khỏi lịch, đơn đã tạo vẫn được giữ. Tiếp tục?"))deleteBk(b.id);}}>🗑 Xoá khỏi lịch</button>
               </div>
             )}
 
@@ -1346,13 +1567,28 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
                 <button className="xs xs-red" onClick={()=>deleteBk(b.id)}>🗑 Xoá hẳn</button>
               </div>
             )}
-            {b.status!=="waiting"&&b.status!=="cancel"&&(
+            {b.status==="converted"&&(
+              <div style={{display:"flex",gap:6,marginTop:4}}>
+                <span style={{fontSize:12,color:T.green,fontWeight:700}}>✅ Đã tạo đơn</span>
+                {b.orderId&&<button className="xs xs-green" onClick={()=>{
+                  const ord=orders.find(o=>o.id===b.orderId);
+                  if(ord){ onSelectOrder && onSelectOrder(ord); }
+                  else toast("⚠️ Không tìm thấy đơn liên quan!");
+                }}>📋 Xem đơn</button>}
+                <button className="xs xs-red" onClick={()=>{if(window.confirm("Chỉ xoá booking khỏi lịch, đơn đã tạo vẫn được giữ. Tiếp tục?"))deleteBk(b.id);}}>🗑 Xoá khỏi lịch</button>
+              </div>
+            )}
+            {b.status!=="waiting"&&b.status!=="cancel"&&b.status!=="converted"&&(
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {b.status==="pending"&&(
                   <button className="xs xs-green" onClick={()=>confirm(b.id)}>✅ Xác nhận</button>
                 )}
-                <button className="xs xs-green" onClick={()=>createOrderFromBk(b)}>📋 Tạo đơn</button>
-                <button className="xs" onClick={()=>{navigator.clipboard?.writeText("https://mitchi-shop.vercel.app");toast("📋 Copy QR link!");}}>📤 Gửi QR</button>
+                {b.orderId ? (
+                  <button className="xs" disabled style={{opacity:.5}}>✅ Đã tạo đơn</button>
+                ) : (
+                  <button className="xs xs-green" onClick={()=>createOrderFromBk(b)}>📋 Tạo đơn</button>
+                )}
+                <button className="xs" onClick={()=>{navigator.clipboard?.writeText("https://mitchi-shop.vercel.app");toast("📋 Copy link app!");}}>📤 Link app</button>
                 <button className="xs" onClick={()=>{navigator.clipboard?.writeText("Bạn ơi đây là hóa đơn xem bài nhé!\nBạn chuyển khoản giúp Mitchi với nha nha 💜");toast("📋 Copy nhắc TT!");}}>💸 Nhắc TT</button>
                 <button className="xs xs-red" onClick={()=>cancel(b.id)}>✕ Huỷ</button>
               </div>
@@ -1363,6 +1599,41 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
 
       {/* FAB */}
       <button className="fab" onClick={()=>{setNewType("booking");setShowNew(true);}}>{I.plus}</button>
+
+      {/* Modal nhập số câu khi tạo đơn từ booking per_q */}
+      {bkToOrder&&(
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setBkToOrder(null)}>
+          <div className="sheet">
+            <DragHandle/>
+            <div className="sheet-title">📋 Tạo đơn từ booking</div>
+            <div className="card card-blue" style={{display:"flex",gap:12,alignItems:"center",marginBottom:16}}>
+              <div style={{fontSize:28}}>{bkToOrder._snap?.ava||"👤"}</div>
+              <div>
+                <div style={{fontFamily:"Nunito",fontWeight:800}}>{bkToOrder._snap?.name||"?"}</div>
+                <div style={{fontSize:12,color:T.muted}}>{bkToOrder._svc?.ico} {bkToOrder._svc?.name}</div>
+                <div style={{fontSize:11,color:T.muted}}>
+                  5 câu đầu: {vnd(bkToOrder._svc?.price||0)}/câu · Từ câu 6: {vnd(bkToOrder._svc?.price6||bkToOrder._svc?.price||0)}/câu
+                </div>
+              </div>
+            </div>
+            <div className="f">
+              <label>Số câu khách muốn xem</label>
+              <input type="number" min="1" max="50" placeholder="Nhập số câu..." value={bkQty}
+                onChange={e=>setBkQty(e.target.value)}
+                autoFocus/>
+            </div>
+            {bkQty>0&&(
+              <div className="card card-green" style={{marginBottom:12,fontFamily:"Nunito",fontWeight:800,fontSize:16}}>
+                💰 Tổng: {vnd(calcQ(Number(bkQty),bkToOrder._svc?.price||0,bkToOrder._svc?.price6||bkToOrder._svc?.price||0))}
+              </div>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              <button className="btn btn-primary" style={{flex:2}} onClick={confirmBkOrder}>📋 Tạo đơn</button>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setBkToOrder(null)}>Huỷ</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal tạo booking */}
       {showNew&&(
@@ -1445,16 +1716,16 @@ function BookingPage({bookings, setBookings, customers, services, orders, setOrd
           <div className="sheet">
             <DragHandle/>
             <div className="sheet-title">📅 Đặt lịch cho khách</div>
-            <div className="card card-blue" style={{marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
-              <div style={{fontSize:28}}>{cAva(bookings.find(b=>b.id===scheduleId).custId)}</div>
-              <div>
-                <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{cName(bookings.find(b=>b.id===scheduleId).custId)}</div>
-                <div style={{fontSize:12,color:T.muted}}>{sName(bookings.find(b=>b.id===scheduleId).svcId)}</div>
-                {bookings.find(b=>b.id===scheduleId).notes&&(
-                  <div style={{fontSize:11,color:T.muted,marginTop:2}}>📝 {bookings.find(b=>b.id===scheduleId).notes}</div>
-                )}
+            {(()=>{ const bk=bookings.find(b=>b.id===scheduleId); const bc=getBkCust(bk||{}); return(
+              <div className="card card-blue" style={{marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{fontSize:28}}>{bc.ava||"👤"}</div>
+                <div>
+                  <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{bc.name}</div>
+                  <div style={{fontSize:12,color:T.muted}}>{sName(bk?.svcId)}</div>
+                  {bk?.notes&&<div style={{fontSize:11,color:T.muted,marginTop:2}}>📝 {bk.notes}</div>}
+                </div>
               </div>
-            </div>
+            );})()}
             <div style={{display:"flex",gap:8}}>
               <div className="f" style={{flex:1}}>
                 <label>Ngày xem bài (DD/MM/YYYY)</label>
@@ -1745,28 +2016,41 @@ function MessagesPage({toast, replies, setReplies}) {
 // ── REPORT PAGE ───────────────────────────────────────────────────────────────
 function ReportPage({orders, customers, services}) {
   const [period, setPeriod] = useState("month");
-  const paidOrders = orders.filter(o=>o.status==="paid");
+  const now2 = new Date();
+  const periodOrders = orders.filter(o => {
+    if(!o.date) return period==="all";
+    const [d,m,y] = (o.date||"").split("/").map(Number);
+    if(!d||!m||!y) return period==="all";
+    const od = new Date(y,m-1,d);
+    const diff = Math.floor((now2-od)/86400000);
+    if(period==="week")  return diff>=0&&diff<7;
+    if(period==="month") return od.getMonth()===now2.getMonth()&&od.getFullYear()===now2.getFullYear();
+    return true;
+  });
+  const paidOrders = periodOrders.filter(o=>o.status==="paid");
   const totalRev   = paidOrders.reduce((s,o)=>s+o.total,0);
-  const totalTips  = orders.reduce((s,o)=>s+(o.tips||0),0);
-  const activeOrders = orders.filter(o=>o.status!=="cancel");
+  const totalTips  = paidOrders.reduce((s,o)=>s+(o.tips||0),0);
+  const activeOrders = periodOrders.filter(o=>o.status!=="cancel");
 
-  // Repeat customers
-  const repeatCusts = customers.filter(c=>orders.filter(o=>o.custId===c.id).length>1);
-  // Chỉ tính khách THẬT (có ít nhất 1 đơn)
-  const custsWithOrders = customers.filter(c=>orders.some(o=>o.custId===c.id));
+  // Repeat customers (trong kỳ)
+  const repeatCusts = customers.filter(c=>periodOrders.filter(o=>o.custId===c.id&&o.status!=="cancel").length>1);
+  // Chỉ tính khách THẬT (có ít nhất 1 đơn trong kỳ)
+  const custsWithOrders = customers.filter(c=>periodOrders.some(o=>o.custId===c.id));
   const repeatRate  = custsWithOrders.length>0?Math.round(repeatCusts.length/custsWithOrders.length*100):0;
   const avgSpend = custsWithOrders.length>0?Math.round(totalRev/custsWithOrders.length):0;
   const avgTips  = custsWithOrders.length>0?Math.round(totalTips/custsWithOrders.length):0;
 
-  // Service revenue
+  // Service revenue — tính TẤT CẢ items cùng service
   const svcStats = services.map(s=>{
     const rev = paidOrders.reduce((sum,o)=>{
-      const it=o.items.find(i=>i.svcId===s.id); if(!it) return sum;
-      return sum+(s.type==="fixed"?s.price:calcQ(it.qty,s.price,s.price6));
+      return sum+(o.items||[]).filter(i=>i.svcId===s.id).reduce((x,it)=>{
+        return x+(s.type==="fixed"?s.price:calcQ(it.qty||0,s.price,s.price6||s.price));
+      },0);
     },0);
-    const cnt = activeOrders.filter(o=>o.items.some(i=>i.svcId===s.id)).length;
-    const tipAvg = cnt>0?Math.round(paidOrders.filter(o=>o.items.some(i=>i.svcId===s.id)).reduce((sum,o)=>sum+(o.tips||0),0)/Math.max(cnt,1)):0;
-    const repCnt = customers.filter(c=>{const ords=orders.filter(o=>o.custId===c.id&&o.items.some(i=>i.svcId===s.id));return ords.length>1;}).length;
+    const cnt = activeOrders.filter(o=>(o.items||[]).some(i=>i.svcId===s.id)).length;
+    const tipOrds = paidOrders.filter(o=>(o.items||[]).some(i=>i.svcId===s.id));
+    const tipAvg = tipOrds.length>0?Math.round(tipOrds.reduce((sum,o)=>sum+(o.tips||0),0)/tipOrds.length):0;
+    const repCnt = customers.filter(c=>periodOrders.filter(o=>o.custId===c.id&&(o.items||[]).some(i=>i.svcId===s.id)).length>1).length;
     return {...s, rev, cnt, tipAvg, repRate:cnt>0?Math.round(repCnt/Math.max(cnt,1)*100):0};
   }).filter(s=>s.cnt>0).sort((a,b)=>b.rev-a.rev);
   const maxRev = svcStats[0]?.rev||1;
@@ -1785,9 +2069,9 @@ function ReportPage({orders, customers, services}) {
   // Tips leaderboard
   const tipsBoard = customers.map(c=>({
     ...c,
-    tips:orders.filter(o=>o.custId===c.id).reduce((s,o)=>s+(o.tips||0),0),
+    tips:periodOrders.filter(o=>o.custId===c.id).reduce((s,o)=>s+(o.tips||0),0),
     spent:paidOrders.filter(o=>o.custId===c.id).reduce((s,o)=>s+o.total,0),
-    cnt:orders.filter(o=>o.custId===c.id).length,
+    cnt:periodOrders.filter(o=>o.custId===c.id).length,
   })).filter(c=>c.tips>0||c.spent>0).sort((a,b)=>b.spent+b.tips-(a.spent+a.tips));
 
   const WEEK_DATA = (() => {
@@ -1935,7 +2219,7 @@ function ReportPage({orders, customers, services}) {
         <div className="sec-h"><div className="sec-t">📊 Doanh thu 7 ngày</div></div>
         <div className="card">
           <div className="bc">
-            {WEEK_DAYS.map((d,i)=>(
+            {getLast7Labels().map((d,i)=>(
               <div key={d} className="bcol">
                 <div className="bbar" style={{height:`${(WEEK_DATA[i]/maxW)*70}px`,background:COLS[i],borderRadius:6,opacity:.85}}/>
                 <div className="blbl">{d}</div>
@@ -1953,7 +2237,7 @@ function ReportPage({orders, customers, services}) {
 }
 
 // ── SERVICE MANAGER ───────────────────────────────────────────────────────────
-function ServiceManager({services, setServices, toast}) {
+function ServiceManager({services, setServices, orders, toast}) {
   const [modal,  setModal]  = useState(false);
   const [editId, setEditId] = useState(null);
   const [delId,  setDelId]  = useState(null);
@@ -2002,7 +2286,11 @@ function ServiceManager({services, setServices, toast}) {
             <div className="card card-red" style={{marginTop:10}}>
               <div style={{fontSize:13,fontWeight:700,color:T.red,marginBottom:8}}>Xoá "{s.name}"?</div>
               <div style={{display:"flex",gap:8}}>
-                <button className="xs xs-red" onClick={()=>{setServices(p=>p.filter(x=>x.id!==s.id));setDelId(null);toast("🗑 Đã xoá!");}}>Xoá</button>
+                <button className="xs xs-red" onClick={()=>{
+                  const used=(orders||[]).some(o=>(o.items||[]).some(it=>it.svcId===s.id));
+                  if(used){toast("⚠️ Dịch vụ đã có trong đơn cũ — chỉ nên ẩn!");return;}
+                  setServices(p=>p.filter(x=>x.id!==s.id));setDelId(null);toast("🗑 Đã xoá!");
+                }}>Xoá</button>
                 <button className="xs" onClick={()=>setDelId(null)}>Huỷ</button>
               </div>
             </div>
@@ -2257,7 +2545,7 @@ function TopicManager({topics, setTopics, toast}) {
 
 
 // ── SETTINGS PAGE ─────────────────────────────────────────────────────────────
-function SettingsPage({logout, toast, services, setServices, shop, setShop, topics, setTopics, onExportExcel, onImportExcelClick}) {
+function SettingsPage({logout, toast, services, setServices, orders, shop, setShop, topics, setTopics, onExportExcel, onImportExcelClick}) {
   const [section, setSection] = useState(null);
 
   return(
@@ -2275,7 +2563,7 @@ function SettingsPage({logout, toast, services, setServices, shop, setShop, topi
           </div>
         </div>
 
-        <ServiceManager services={services} setServices={setServices} toast={toast}/>
+        <ServiceManager services={services} setServices={setServices} orders={orders} toast={toast}/>
 
         <div style={{fontFamily:"Nunito",fontWeight:700,fontSize:11,color:T.muted,textTransform:"uppercase",letterSpacing:1,margin:"20px 0 10px"}}>Chủ đề câu hỏi</div>
         <TopicManager topics={topics} setTopics={setTopics} toast={toast}/>
@@ -2290,18 +2578,7 @@ function SettingsPage({logout, toast, services, setServices, shop, setShop, topi
           {ico:"📤",t:"Xuất Excel backup",   s:"Tải toàn bộ khách, đơn, lịch, dịch vụ về máy",                      fn:onExportExcel},
           {ico:"📥",t:"Nhập Excel backup",   s:"Khôi phục/gộp dữ liệu từ file Excel backup",                       fn:onImportExcelClick},
           {ico:"☁️",t:"Sao lưu & đồng bộ", s:"Mở Supabase dashboard để kiểm tra backup cloud",                    fn:()=>window.open('https://supabase.com/dashboard','_blank')},
-          {ico:"🧹",t:"Xoá khách không có đơn", s:`Dọn dẹp khách chưa có đơn nào trong hệ thống`,fn:async()=>{
-            // Tìm khách không có đơn - check cả 2 variants của custId
-            const noOrderCusts=customers.filter(c=>
-              !orders.some(o=>(o.custId||o.custid||"")===c.id)
-            );
-            if(noOrderCusts.length===0){toast("✅ Không có khách nào cần xoá!");return;}
-            if(!window.confirm("Xoá "+noOrderCusts.length+" khách chưa có đơn nào?\nKiểm tra kỹ trước khi xoá!\nKhông thể hoàn tác!")) return;
-            if(!window.confirm("Xác nhận lần 2: Chắc chắn xoá "+noOrderCusts.length+" khách?")) return;
-            setCustomers(p=>p.filter(c=>orders.some(o=>(o.custId||o.custid||"")===c.id)));
-            await Promise.all(noOrderCusts.map(c=>sbFetch("/customers?id=eq."+c.id,{method:"DELETE",prefer:""}).catch(console.error)));
-            toast("🧹 Đã xoá "+noOrderCusts.length+" khách không có đơn!");
-          }},
+
         ].map(x=>(
           <div key={x.t} className="row" onClick={x.fn}>
             <div style={{fontSize:22,width:36,textAlign:"center",flexShrink:0}}>{x.ico}</div>
@@ -2335,9 +2612,21 @@ function Dashboard({nav, orders, setOrders, saveOrder, customers, services, book
   const revToday   = todayOrds.filter(o=>o.status==="paid").reduce((s,o)=>s+o.total,0);
   const tipsToday  = todayOrds.reduce((s,o)=>s+(o.tips||0),0);
   const todayBks   = bookings.filter(b=>b.date===todayStr()&&b.status!=="cancel"&&b.status!=="waiting");
-  const pendingBks = todayBks.filter(b=>b.status==="pending").length;
+  const pendingTodayBks = todayBks.filter(b=>b.status==="pending");
+  const pendingBks = pendingTodayBks.length;
 
   const custOrders = id => orders.filter(o=>o.custId===id);
+  // Lấy ngày đơn mới nhất (không huỷ) từ orders thật
+  const getLatestOrdDate = id => {
+    const valid = orders.filter(o=>o.custId===id&&o.status!=="cancel"&&o.date);
+    if(!valid.length) return "";
+    return valid.sort((a,b)=>{
+      const parse = s=>{ const [d,m,y]=s.split("/").map(Number); return new Date(y,m-1,d).getTime(); };
+      return parse(b.date)-parse(a.date);
+    })[0].date;
+  };
+  const getOrderCust = o => customers.find(c=>c.id===o.custId) || o.customerSnapshot || {name:"Khách không xác định",ava:"👤"};
+  const getBkCustD   = b => customers.find(c=>c.id===b.custId) || b.customerSnapshot || {name:"Khách không xác định",ava:"👤"};
   const daysSince  = dateStr => {
     if(!dateStr||dateStr==="-"||dateStr==="") return 999;
     try {
@@ -2349,8 +2638,21 @@ function Dashboard({nav, orders, setOrders, saveOrder, customers, services, book
       return Math.floor((new Date()-new Date(y,m-1,d))/(86400000));
     } catch { return 999; }
   };
-  const needFollowUp = customers.filter(c=>daysSince(c.lastOrder||"")>21&&custOrders(c.id).length>0);
-  const topSvc = [...services].filter(s=>s.active).sort((a,b)=>b.sold-a.sold)[0];
+  const needFollowUp = customers.filter(c=>daysSince(getLatestOrdDate(c.id))>21&&custOrders(c.id).some(o=>o.status!=="cancel"));
+  // Top service từ orders thật (7 ngày)
+  const topSvc = (() => {
+    const counts = {};
+    const now = new Date();
+    orders.filter(o=>["paid","done"].includes(o.status)).forEach(o=>{
+      const parts=(o.date||"").split("/").map(Number);
+      if(parts.length<3) return;
+      const diff=Math.floor((now-new Date(parts[2],parts[1]-1,parts[0]))/86400000);
+      if(diff<0||diff>=7) return; // chỉ 7 ngày gần nhất, không tính tương lai
+      (o.items||[]).forEach(it=>{ counts[it.svcId]=(counts[it.svcId]||0)+1; });
+    });
+    const topId=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0];
+    return services.find(s=>s.id===topId);
+  })();
   // Compute real revenue for last 7 days
   const WEEK_DATA = (() => {
     const result = [0,0,0,0,0,0,0];
@@ -2429,7 +2731,7 @@ function Dashboard({nav, orders, setOrders, saveOrder, customers, services, book
         <div className="sec">
           <div className="sec-h"><div className="sec-t">⚡ Cần xử lý</div></div>
           {unpaidOrds.slice(0,3).map(o=>{
-            const c=customers.find(x=>x.id===o.custId);
+            const c=getOrderCust(o);
             const nl=STATUS_MAP[STATUS_FLOW[STATUS_FLOW.indexOf(o.status)+1]];
             return(
               <div key={o.id} className="action-card" style={{borderLeft:`3px solid ${o.status==="done"?T.yellow:o.status==="view"?T.purple:T.blue}`}}>
@@ -2442,7 +2744,7 @@ function Dashboard({nav, orders, setOrders, saveOrder, customers, services, book
                 </div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   {nl&&<button className="xs xs-green" onClick={()=>advanceOrder(o.id)}>→ {nl[0]}</button>}
-                  <button className="xs" onClick={()=>{navigator.clipboard?.writeText(REPLIES[3].body);toast("📋 Copy nhắc TT!");}}>💸 Nhắc TT</button>
+                  <button className="xs" onClick={()=>{navigator.clipboard?.writeText(getReplyBody("#thanhtoan"));toast("📋 Copy nhắc TT!");}}>💸 Nhắc TT</button>
                   <button className="xs" onClick={()=>nav("orders")}>Xem đơn</button>
                 </div>
               </div>
@@ -2461,7 +2763,7 @@ function Dashboard({nav, orders, setOrders, saveOrder, customers, services, book
         <div className="sec">
           <div className="sec-h"><div className="sec-t">📅 Booking chờ xác nhận</div></div>
           {todayBks.filter(b=>b.status==="pending").map(b=>{
-            const c=customers.find(x=>x.id===b.custId);
+            const c=getBkCustD(b);
             return(
               <div key={b.id} className="action-card action-card-yellow">
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
@@ -2492,7 +2794,7 @@ function Dashboard({nav, orders, setOrders, saveOrder, customers, services, book
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               {needFollowUp.slice(0,3).map(c=>(
                 <button key={c.id} className="xs" style={{background:T.purplebg,borderColor:T.purple,color:T.purple}}
-                  onClick={()=>{navigator.clipboard?.writeText(REPLIES[6].body.replace("bạn",c.nick||c.name));toast(`📋 Copy tin follow-up cho ${c.nick||c.name}!`);}}>
+                  onClick={()=>{navigator.clipboard?.writeText(getReplyBody("#followup").replace("bạn",c.nick||c.name));toast(`📋 Copy tin follow-up cho ${c.nick||c.name}!`);}}>
                   {c.ava} {c.nick||c.name}
                 </button>
               ))}
@@ -2509,7 +2811,7 @@ function Dashboard({nav, orders, setOrders, saveOrder, customers, services, book
             <span className="sec-a" onClick={()=>nav("booking")}>Xem tất cả</span>
           </div>
           {todayBks.filter(b=>b.status==="confirmed").map(b=>{
-            const c=customers.find(x=>x.id===b.custId);
+            const c=getBkCustD(b);
             return(
               <div key={b.id} className="row" style={{borderLeft:`3px solid ${T.green}`}}>
                 <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:18,minWidth:50,color:T.ink}}>{b.time}</div>
@@ -2529,7 +2831,7 @@ function Dashboard({nav, orders, setOrders, saveOrder, customers, services, book
         <div className="sec-h"><div className="sec-t">📊 Doanh thu tuần</div><span className="sec-a" onClick={()=>nav("report")}>Chi tiết</span></div>
         <div className="card">
           <div className="bc">
-            {WEEK_DAYS.map((d,i)=>(
+            {getLast7Labels().map((d,i)=>(
               <div key={d} className="bcol">
                 <div className="bbar" style={{height:`${(WEEK_DATA[i]/maxW)*70}px`,background:COLS[i]}}/>
                 <div className="blbl">{d}</div>
@@ -2642,7 +2944,7 @@ function Login({onLogin}) {
           </div>
         )}
         {err&&<div style={{color:err.startsWith("✅")?T.green:T.red,fontSize:13,fontWeight:700,marginBottom:12,lineHeight:1.4}}>{err}</div>}
-        <button className="btn btn-yellow" onClick={go} disabled={load} style={{opacity:load?.6:1}}>
+        <button className="btn btn-yellow" onClick={go} disabled={load} style={{opacity:load?0.6:1}}>
           {load?"⏳ Đang xử lý...":(tab==="login"?"Đăng nhập 🐸":"Tạo tài khoản 🐸")}
         </button>
         {tab==="signup"&&(
@@ -2758,12 +3060,18 @@ function normalizeImported(table, rows) {
     const x = {...r};
     if (table === "orders") {
       x.items = safeJson(x.items, []);
+      x.customerSnapshot = safeJson(x.customerSnapshot, null);
       x.extraQ = Number(x.extraQ || 0);
       x.total = Number(x.total || 0);
       x.tips = Number(x.tips || 0);
     }
+    if (table === "bookings") {
+      x.customerSnapshot = safeJson(x.customerSnapshot, null);
+      x.orderId = x.orderId || x.orderid || null;
+    }
     if (table === "customers") {
       x.tags = safeJson(x.tags, []);
+      x.archived = x.archived===true||x.archived==="true"||x.archived===1||x.archived==="1";
     }
     if (table === "replies") {
       x.images = safeJson(x.images, []);
@@ -2779,14 +3087,15 @@ function normalizeImported(table, rows) {
 }
 
 export default function App() {
-  const [auth,      setAuth]      = useState(false);
-  const [page,      setPage]      = useState("dashboard");
-  const [toastMsg,  setToast]     = useState("");
-  const [services,  setServices]  = useState(SEED_SVCS);
-  const [customers, setCustomers] = useState(SEED_CUSTS);
-  const [orders,    setOrders]    = useState(SEED_ORDERS);
-  const [bookings,  setBookings]  = useState(SEED_BOOKINGS);
-  const [defCustId, setDefCustId] = useState(null);
+  const [auth,           setAuth]          = useState(()=>{ if(typeof window==="undefined") return false; return localStorage.getItem('mitchi_auth')==='1'; });
+  const [page,           setPage]          = useState("dashboard");
+  const [toastMsg,       setToast]         = useState("");
+  const [services,       setServices]      = useState(SEED_SVCS);
+  const [customers,      setCustomers]     = useState(SEED_CUSTS);
+  const [orders,         setOrders]        = useState(SEED_ORDERS);
+  const [bookings,       setBookings]      = useState(SEED_BOOKINGS);
+  const [defCustId,      setDefCustId]     = useState(null);
+  const [highlightOrder, setHighlightOrder]= useState(null);
   const [shop,      setShop]      = useState(DEFAULT_SHOP);
   const [replies,   setReplies]   = useState(REPLIES);
   const [topics,    setTopics]    = useState(["Tình yêu","Hôn nhân / Ex","Sự nghiệp","Tài chính","Gia đình","Sức khỏe","Tổng quát"]);
@@ -2822,14 +3131,24 @@ export default function App() {
         ...o,
         custId: o.custId || o["custId"] || o.custid || o["custid"] || "",
         items:  (() => { try { return typeof o.items==="string" ? JSON.parse(o.items||"[]") : (o.items||[]); } catch { return []; } })(),
+        customerSnapshot: (() => { try { return o.customerSnapshot ? (typeof o.customerSnapshot==="string" ? JSON.parse(o.customerSnapshot) : o.customerSnapshot) : null; } catch { return null; } })(),
         extraQ: Number(o.extraQ || o.extraq || 0),
         total:  Number(o.total  || 0),
         tips:   Number(o.tips   || 0),
       })) : []);
       setBookings(bks.length ? bks.map(b => ({
         ...b,
-        custId: b.custId || b["custId"] || b.custid || "",
-        svcId:  b.svcId  || b["svcId"]  || b.svcid  || "",
+        custId: b.custId || b["custId"] || b.custid || b["custid"] || "",
+        svcId:  b.svcId  || b["svcId"]  || b.svcid  || b["svcid"]  || "",
+        date:   b.date   || "",
+        time:   b.time   || "",
+        status: b.status || "pending",
+        notes:  b.notes  || "",
+        orderId: b.orderId || b.orderid || null,
+        customerSnapshot: (() => {
+          try { return b.customerSnapshot ? (typeof b.customerSnapshot==="string" ? JSON.parse(b.customerSnapshot) : b.customerSnapshot) : null; }
+          catch { return null; }
+        })(),
       })) : []);
       setReplies(reps.length ? reps.map(r => ({
         ...r,
@@ -2913,6 +3232,7 @@ export default function App() {
         phone: c.phone||"", social: c.social||"",
         tags: c.tags||[], notes: c.notes||"", ava: c.ava||"🌙",
         created: c.created||"", "lastOrder": c.lastOrder||"",
+        archived: !!c.archived,
       }).catch(console.error));
       prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("customers", id).catch(console.error));
       return next;
@@ -2933,6 +3253,8 @@ export default function App() {
         time: b.time||"",
         status: b.status||"pending",
         notes: b.notes||"",
+        "orderId": b.orderId||null,
+        "customerSnapshot": b.customerSnapshot ? JSON.stringify(b.customerSnapshot) : null,
       }).catch(console.error));
       prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("bookings", id).catch(console.error));
       return next;
@@ -2958,7 +3280,17 @@ export default function App() {
       return exists ? p.map(x=>x.id===o.id?o:x) : [o,...p];
     });
     const cid = o.custId||o.custid||"";
-    if(cid) setCustomers(p=>p.map(c=>c.id===cid?{...c,lastOrder:o.date}:c));
+    if(cid) setCustomers(p=>p.map(c=>{
+      if(c.id!==cid) return c;
+      // Tính lại lastOrder từ orders thật (không dùng ngày đơn vừa sửa)
+      const allOrds = [...orders.filter(x=>x.id!==o.id&&x.custId===cid), o]
+        .filter(x=>x.status!=="cancel"&&x.date);
+      const latest = allOrds.sort((a,b)=>{
+        const p = s=>{const [d,m,y]=(s||"").split("/").map(Number);return new Date(y,m-1,d).getTime();};
+        return p(b.date)-p(a.date);
+      })[0]?.date||"";
+      return {...c, lastOrder:latest};
+    }));
     try {
       if (!o.id) return;
       // Không lưu đơn nếu không có custId hợp lệ
@@ -2976,6 +3308,7 @@ export default function App() {
         date: o.date||"",
         time: o.time||"",
         notes: o.notes||"",
+        customerSnapshot: o.customerSnapshot ? JSON.stringify(o.customerSnapshot) : null,
       };
       await sb.upsert("orders", orderRow);
       if (o.custId) {
@@ -2985,8 +3318,14 @@ export default function App() {
   };
 
   const deleteOrder = async (id) => {
-    setOrders(p=>p.filter(o=>o.id!==id));
-    try { await sb.delete("orders", id); } catch(e) { console.error("Delete order:", e); }
+    // DB trước, local sau + rollback nếu fail
+    try {
+      await sb.delete("orders", id);
+      setOrders(p=>p.filter(o=>o.id!==id));
+    } catch(e) {
+      console.error("Delete order:", e);
+      toast("⚠️ Không xoá được đơn. Thử lại!");
+    }
   };
 
   // Xoá phantom orders (không có custId) khỏi DB
@@ -3000,30 +3339,10 @@ export default function App() {
     await Promise.all(phantom.map(o => sb.delete("orders", o.id).catch(console.error)));
   };
 
-  // Xoá phantom customers: khách không có đơn nào
-  const cleanPhantomCustomers = async (custs, ords) => {
-    const realOrderCustIds = new Set(
-      ords.map(o=>o.custId||o["custId"]||o.custid||"").filter(Boolean)
-    );
-    // Phantom = khách không có đơn nào VÀ tạo > 24h trước
-    // Grace period 24h để tránh xoá khách mới thêm chưa kịp tạo đơn
-    const nowMs = Date.now();
-    const phantom = custs.filter(c => {
-      if (realOrderCustIds.has(c.id)) return false; // có đơn → giữ
-      try {
-        const raw = c.created_at || c.created || "";
-        if (!raw) return true;
-        const d = raw.includes('/')
-          ? (() => { const [day,mon,yr]=raw.split('/').map(Number); return new Date(yr,mon-1,day); })()
-          : new Date(raw);
-        return (nowMs - d.getTime()) > 86400000; // >24h mới xoá
-      } catch { return true; }
-    });
-    if (phantom.length === 0) { console.log("No phantom customers ✅"); return; }
-    console.log(`Cleaning ${phantom.length} phantom customers...`);
-    setCustomers(prev => prev.filter(c => !phantom.some(p=>p.id===c.id)));
-    await Promise.all(phantom.map(c => sb.delete("customers", c.id).catch(console.error)));
-    console.log("Phantom customers cleaned ✅");
+  // Detect customers không có đơn (chỉ detect, không xoá tự động)
+  const detectCustomersWithoutOrders = (custs, ords) => {
+    const orderCustIds = new Set(ords.map(o=>o.custId||o.custid||"").filter(Boolean));
+    return custs.filter(c => !orderCustIds.has(c.id) && !c.archived);
   };
 
   const createOrderFor = custId => { setDefCustId(custId); setPage("orders"); };
@@ -3125,22 +3444,27 @@ export default function App() {
       customers={customers} services={services} toast={toast}
       defaultCustId={defCustId} clearDefaultCust={clearDef} shop={shop}
       topics={topics} setTopics={setTopics}
+      highlightOrder={highlightOrder} clearHighlight={()=>setHighlightOrder(null)}
     />,
     customers: <CustomersPage
       customers={customers} setCustomers={setCustomersAndSync}
-      orders={orders} services={services}
-      toast={toast} onCreateOrder={createOrderFor}
+      orders={orders} setOrders={setOrders}
+      bookings={bookings} setBookings={setBookingsAndSync}
+      services={services} toast={toast} onCreateOrder={createOrderFor}
     />,
     booking: <BookingPage
       bookings={bookings} setBookings={setBookingsAndSync}
       customers={customers} services={services}
       orders={orders} setOrders={setOrders} saveOrder={saveOrder}
+      onSelectOrder={o=>{ setPage("orders"); setHighlightOrder(o.id); }}
       toast={toast}
     />,
     messages: <MessagesPage toast={toast} replies={replies} setReplies={setRepliesAndSync}/>,
     report:   <ReportPage orders={orders} customers={customers} services={services}/>,
     settings: <SettingsPage
+      orders={orders}
       logout={()=>{
+          localStorage.removeItem('mitchi_auth');
           setAuth(false);
           setDbReady(false);
           setServices([]);
@@ -3161,7 +3485,7 @@ export default function App() {
     <>
       <style>{CSS}</style>
       {!auth ? (
-        <Login onLogin={()=>{ setDbReady(false); setAuth(true); }}/>
+        <Login onLogin={()=>{ if(typeof window!=="undefined") localStorage.setItem("mitchi_auth","1"); setDbReady(false); setAuth(true); }}/>
       ) : (
         <div className="app">
           <SyncBanner/>
