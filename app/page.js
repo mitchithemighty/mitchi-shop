@@ -957,7 +957,7 @@ function OrdersPage({orders, setOrders, saveOrder, deleteOrder, customers, servi
 }
 
 // ── CUSTOMERS PAGE ────────────────────────────────────────────────────────────
-function CustomersPage({customers, setCustomers, orders, setOrders, bookings, setBookings, services, toast, onCreateOrder}) {
+function CustomersPage({customers, setCustomers, orders, setOrders, bookings, setBookings, services, toast, onCreateOrder, deleteOrder}) {
   const [sel,     setSel]     = useState(null);
   const [modal,   setModal]   = useState(false);
   const [editC,   setEditC]   = useState(null);
@@ -1091,6 +1091,34 @@ function CustomersPage({customers, setCustomers, orders, setOrders, bookings, se
     return true;
   });
 
+  const actionSheetNode = actionSheet && (
+    <div className="overlay" onClick={e=>e.target===e.currentTarget&&setActionSheet(null)}>
+      <div className="sheet">
+        <DragHandle/>
+        <div className="sheet-title">⚙️ Xử lý khách</div>
+        <div className="card card-blue" style={{display:"flex",gap:12,alignItems:"center",marginBottom:16}}>
+          <div style={{fontSize:28}}>{actionSheet.ava||"🌙"}</div>
+          <div>
+            <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{actionSheet.name}</div>
+            <div style={{fontSize:12,color:T.muted}}>{orders.filter(o=>o.custId===actionSheet.id).length} đơn liên quan</div>
+          </div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <button className="btn btn-ghost" style={{textAlign:"left",padding:14}} onClick={()=>handleCustAction(1)}>
+            📦 <strong>Lưu trữ</strong> — ẩn khỏi danh sách, giữ toàn bộ đơn
+          </button>
+          <button className="btn btn-ghost" style={{textAlign:"left",padding:14,borderColor:T.red,color:T.red}} onClick={()=>handleCustAction(2)}>
+            🗑 <strong>Xoá khách, giữ đơn</strong> — đơn vẫn hiện tên từ snapshot
+          </button>
+          <button className="btn" style={{textAlign:"left",padding:14,background:"#7B0000",color:"#fff",borderRadius:12,border:"none",fontFamily:"Nunito",fontWeight:700,cursor:"pointer",fontSize:14}} onClick={()=>handleCustAction(3)}>
+            💣 <strong>Xoá toàn bộ</strong> — khách + đơn + booking liên quan
+          </button>
+          <button className="btn btn-ghost" onClick={()=>setActionSheet(null)}>Huỷ</button>
+        </div>
+      </div>
+    </div>
+  );
+
   if(sel) {
     const c=customers.find(x=>x.id===sel);
     if(!c) { setSel(null); return null; }
@@ -1175,6 +1203,13 @@ function CustomersPage({customers, setCustomers, orders, setOrders, bookings, se
                 <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:14}}>{vnd(o.total)}</div>
                 {o.tips>0&&<div style={{fontSize:10,color:T.purple,fontWeight:700}}>+{vnd(o.tips)}</div>}
                 <Badge s={o.status}/>
+                <button className="xs xs-red" style={{marginTop:6,padding:"5px 9px",fontSize:10}}
+                  onClick={(e)=>{
+                    e.stopPropagation();
+                    if(window.confirm("Xoá vĩnh viễn đơn này? Thao tác này không thể hoàn tác.")) deleteOrder?.(o.id);
+                  }}>
+                  🗑 Xoá
+                </button>
               </div>
             </div>
           ))}
@@ -1193,6 +1228,7 @@ function CustomersPage({customers, setCustomers, orders, setOrders, bookings, se
         </div>
 
         {modal&&<CustomerModal form={form} setForm={setForm} onSave={save} onClose={()=>setModal(false)} isEdit={!!editC}/>}
+        {actionSheetNode}
       </div>
     );
   }
@@ -3633,6 +3669,7 @@ export default function App() {
       orders={orders} setOrders={setOrders}
       bookings={bookings} setBookings={setBookingsAndSync}
       services={services} toast={toast} onCreateOrder={createOrderFor}
+      deleteOrder={deleteOrder}
     />,
     booking: <BookingPage
       bookings={bookings} setBookings={setBookingsAndSync}
