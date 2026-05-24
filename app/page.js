@@ -83,7 +83,7 @@ const sb = {
 
   // UPSERT (insert or update by id)
   upsert: (table, row) =>
-    sbFetch(`/${table}`, {
+    sbFetch(`/${table}?on_conflict=id`, {
       method:"POST", body:JSON.stringify(row),
       prefer:"resolution=merge-duplicates,return=representation",
     }),
@@ -339,6 +339,16 @@ const calcOrderTotal = (items, extraQ, services) => {
   });
   t += calcQ(extraQ, 20000, 15000);
   return t;
+};
+const parseVnDateMs = (dateStr) => {
+  const [d,m,y] = String(dateStr||"").split("/").map(Number);
+  if(!d||!m||!y) return 0;
+  return new Date(y,m-1,d).getTime();
+};
+const getLatestOrderDateFromList = (list, custId) => {
+  return (list||[])
+    .filter(o => o && o.custId === custId && o.status !== "cancel" && o.date)
+    .sort((a,b)=>parseVnDateMs(b.date)-parseVnDateMs(a.date))[0]?.date || "";
 };
 const STATUS_MAP = { new:["MỚI","bd-new"], view:["ĐANG XEM","bd-view"], done:["XONG","bd-pend"], paid:["ĐÃ TT","bd-paid"], cancel:["HỦY","bd-can"] };
 const STATUS_FLOW = ["new","view","done","paid","cancel"];
@@ -3045,6 +3055,84 @@ function safeJson(v, fallback) {
   try { return JSON.parse(v); } catch { return fallback; }
 }
 
+
+const CACHE_KEY = "mitchi_cache_v1";
+
+function readLocalCache() {
+  if (typeof window === "undefined") return null;
+  try { return safeJson(localStorage.getItem(CACHE_KEY), null); }
+  catch { return null; }
+}
+
+function writeLocalCache(data) {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); }
+  catch (e) { console.warn("Local cache failed:", e); }
+}
+
+const DIRTY_KEY = "mitchi_dirty_v1";
+
+function readDirtyQueue() {
+  if (typeof window === "undefined") return {};
+  return safeJson(localStorage.getItem(DIRTY_KEY), {}) || {};
+}
+
+function writeDirtyQueue(dirty) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(DIRTY_KEY, JSON.stringify(dirty || {}));
+}
+
+function markDirty(table, id) {
+  if (!id || typeof window === "undefined") return;
+  const dirty = readDirtyQueue();
+  dirty[table] = Array.from(new Set([...(dirty[table] || []), id]));
+  writeDirtyQueue(dirty);
+}
+
+function clearDirty(table, id) {
+  if (!id || typeof window === "undefined") return;
+  const dirty = readDirtyQueue();
+  dirty[table] = (dirty[table] || []).filter(x => x !== id);
+  if (!dirty[table].length) delete dirty[table];
+  writeDirtyQueue(dirty);
+}
+
+function mergeById(cloud = [], local = []) {
+  const map = new Map();
+  (cloud || []).forEach(x => { if (x && x.id) map.set(x.id, x); });
+  (local || []).forEach(x => {
+    if (!x || !x.id) return;
+    map.set(x.id, {...(map.get(x.id) || {}), ...x});
+  });
+  return Array.from(map.values());
+}
+
+function rowForService(s) {
+  return {...s, price:Number(s.price||0), price6:Number(s.price6||0), dur:Number(s.dur||0), active:!!s.active};
+}
+function rowForCustomer(c) {
+  return {
+    id:c.id, name:c.name||"", nick:c.nick||"", phone:c.phone||"", social:c.social||"",
+    tags:c.tags||[], notes:c.notes||"", ava:c.ava||"🌙", created:c.created||"",
+    "lastOrder":c.lastOrder||"", archived:!!c.archived,
+  };
+}
+function rowForOrder(o) {
+  return {
+    id:o.id, "custId":o.custId||null, items:JSON.stringify(o.items||[]), "extraQ":o.extraQ||0,
+    total:o.total||0, tips:o.tips||0, status:o.status||"new", date:o.date||"", time:o.time||"",
+    notes:o.notes||"", customerSnapshot:o.customerSnapshot ? JSON.stringify(o.customerSnapshot) : null,
+  };
+}
+function rowForBooking(b) {
+  return {
+    id:b.id, "custId":b.custId||null, "svcId":b.svcId||null, date:b.date||"", time:b.time||"",
+    status:b.status||"pending", notes:b.notes||"", "orderId":b.orderId||null,
+    "customerSnapshot":b.customerSnapshot ? JSON.stringify(b.customerSnapshot) : null,
+  };
+}
+function rowForReply(r) { return {...r, images:JSON.stringify(r.images||[])}; }
+
 function excelRows(rows) {
   return (rows || []).map(r => {
     const out = {...r};
@@ -3107,10 +3195,86 @@ export default function App() {
   const nav   = id  => setPage(id);
 
   // ── Load all data from Supabase on login ─────────────────────────────
+  const normalizeServices = (rows) => (rows || []).filter(Boolean).map(s => ({
+    ...s,
+    price:Number(s.price||0), price6:Number(s.price6||0), dur:Number(s.dur||0),
+    active:s.active === true || s.active === "true" || s.active === 1 || s.active === "1",
+  })).filter(x=>x.id);
+
+  const normalizeCustomers = (rows) => (rows || []).filter(Boolean).map(c => ({
+    ...c,
+    tags:safeJson(c.tags, []),
+    archived:c.archived===true||c.archived==="true"||c.archived===1||c.archived==="1",
+    lastOrder:c.lastOrder || c.lastorder || "",
+  })).filter(x=>x.id);
+
+  const normalizeOrders = (rows) => (rows || []).filter(Boolean).map(o => ({
+    ...o,
+    custId: o.custId || o["custId"] || o.custid || o["custid"] || "",
+    items: safeJson(o.items, []),
+    customerSnapshot: safeJson(o.customerSnapshot || o.customersnapshot, null),
+    extraQ: Number(o.extraQ || o.extraq || 0),
+    total: Number(o.total || 0),
+    tips: Number(o.tips || 0),
+  })).filter(o => {
+    const cid = o.custId || "";
+    return (cid && String(cid).trim() !== "") || !!o.customerSnapshot;
+  }).filter(x=>x.id);
+
+  const normalizeBookings = (rows) => (rows || []).filter(Boolean).map(b => ({
+    ...b,
+    custId: b.custId || b["custId"] || b.custid || b["custid"] || "",
+    svcId: b.svcId || b["svcId"] || b.svcid || b["svcid"] || "",
+    date: b.date || "",
+    time: b.time || "",
+    status: b.status || "pending",
+    notes: b.notes || "",
+    orderId: b.orderId || b.orderid || null,
+    customerSnapshot: safeJson(b.customerSnapshot || b.customersnapshot, null),
+  })).filter(x=>x.id);
+
+  const normalizeReplies = (rows) => (rows || []).filter(Boolean).map(r => ({
+    ...r,
+    images: safeJson(r.images, []),
+  })).filter(x=>x.id);
+
+  const retryMissingAndDirtySync = async (merged, cloud) => {
+    if (!auth) return;
+    const dirty = readDirtyQueue();
+    const cloudIds = {
+      services:new Set((cloud.services||[]).map(x=>x.id)),
+      customers:new Set((cloud.customers||[]).map(x=>x.id)),
+      orders:new Set((cloud.orders||[]).map(x=>x.id)),
+      bookings:new Set((cloud.bookings||[]).map(x=>x.id)),
+      replies:new Set((cloud.replies||[]).map(x=>x.id)),
+    };
+    const jobs = [
+      ["services", merged.services, rowForService],
+      ["customers", merged.customers, rowForCustomer],
+      ["orders", merged.orders, rowForOrder],
+      ["bookings", merged.bookings, rowForBooking],
+      ["replies", merged.replies, rowForReply],
+    ];
+    for (const [table, rows, toRow] of jobs) {
+      const dirtyIds = new Set(dirty[table] || []);
+      const needs = (rows || []).filter(r => r?.id && (!cloudIds[table].has(r.id) || dirtyIds.has(r.id)));
+      for (const r of needs) {
+        try {
+          await sb.upsert(table, toRow(r));
+          clearDirty(table, r.id);
+        } catch(e) {
+          console.warn("Retry sync failed", table, r.id, e);
+          markDirty(table, r.id);
+        }
+      }
+    }
+  };
+
+  // ── Load all data from Supabase on login ─────────────────────────────
   const loadFromDb = async () => {
     setSyncing(true);
     try {
-      const [svcs, custs, ords, bks, reps, settings] = await Promise.all([
+      const [svcsRaw, custsRaw, ordsRaw, bksRaw, repsRaw, settings] = await Promise.all([
         sb.getAll("services", "name.asc"),
         sbFetch("/customers?order=created_at.desc&limit=2000"),
         sb.getAll("orders", "created_at.desc"),
@@ -3118,64 +3282,86 @@ export default function App() {
         sb.getAll("replies", "created_at.asc"),
         sbFetch("/shop_settings?id=eq.singleton"),
       ]);
-      // Parse JSON fields from Supabase string columns
-      setServices(svcs.length ? svcs : []);
-      setCustomers(custs.length ? custs : []);
-      // Lọc bỏ orders không có custId (phantom orders từ session cũ)
-      const validOrds = ords.filter(o => {
-        const cid = o.custId || o["custId"] || o.custid || o["custid"] || "";
-        return cid && cid.trim() !== "";
-      });
-      // Normalize custId to camelCase after loading
-      setOrders(validOrds.length ? validOrds.map(o => ({
-        ...o,
-        custId: o.custId || o["custId"] || o.custid || o["custid"] || "",
-        items:  (() => { try { return typeof o.items==="string" ? JSON.parse(o.items||"[]") : (o.items||[]); } catch { return []; } })(),
-        customerSnapshot: (() => { try { return o.customerSnapshot ? (typeof o.customerSnapshot==="string" ? JSON.parse(o.customerSnapshot) : o.customerSnapshot) : null; } catch { return null; } })(),
-        extraQ: Number(o.extraQ || o.extraq || 0),
-        total:  Number(o.total  || 0),
-        tips:   Number(o.tips   || 0),
-      })) : []);
-      setBookings(bks.length ? bks.map(b => ({
-        ...b,
-        custId: b.custId || b["custId"] || b.custid || b["custid"] || "",
-        svcId:  b.svcId  || b["svcId"]  || b.svcid  || b["svcid"]  || "",
-        date:   b.date   || "",
-        time:   b.time   || "",
-        status: b.status || "pending",
-        notes:  b.notes  || "",
-        orderId: b.orderId || b.orderid || null,
-        customerSnapshot: (() => {
-          try { return b.customerSnapshot ? (typeof b.customerSnapshot==="string" ? JSON.parse(b.customerSnapshot) : b.customerSnapshot) : null; }
-          catch { return null; }
-        })(),
-      })) : []);
-      setReplies(reps.length ? reps.map(r => ({
-        ...r,
-        images: (() => {
-          try { return r.images ? JSON.parse(r.images) : []; }
-          catch { return []; }
-        })(),
-      })) : []);  // Không dùng REPLIES mặc định - tránh auto-sync
+
+      const localCache = readLocalCache() || {};
+      const cloudServices = normalizeServices(svcsRaw);
+      const cloudCustomers = normalizeCustomers(custsRaw);
+      const cloudOrders = normalizeOrders(ordsRaw);
+      const cloudBookings = normalizeBookings(bksRaw);
+      const cloudReplies = normalizeReplies(repsRaw);
+
+      const localServices = normalizeServices(localCache.services || []);
+      const localCustomers = normalizeCustomers(localCache.customers || []);
+      const localOrders = normalizeOrders(localCache.orders || []);
+      const localBookings = normalizeBookings(localCache.bookings || []);
+      const localReplies = normalizeReplies(localCache.replies || []);
+
+      const mergedServices = mergeById(cloudServices, localServices);
+      const mergedCustomers = mergeById(cloudCustomers, localCustomers);
+      const mergedOrders = mergeById(cloudOrders, localOrders);
+      const mergedBookings = mergeById(cloudBookings, localBookings);
+      const mergedReplies = mergeById(cloudReplies, localReplies);
+
+      setServices(mergedServices);
+      setCustomers(mergedCustomers);
+      setOrders(mergedOrders);
+      setBookings(mergedBookings);
+      setReplies(mergedReplies);
+
+      let nextShop = localCache.shop || DEFAULT_SHOP;
+      let nextTopics = localCache.topics || ["Tình yêu","Hôn nhân / Ex","Sự nghiệp","Tài chính","Gia đình","Sức khỏe","Tổng quát"];
       if (settings.length) {
-        const s = settings[0];
-        if (s.shop)   { try { setShop(JSON.parse(s.shop)); }   catch{} }
-        if (s.topics) { try { setTopics(JSON.parse(s.topics)); } catch{} }
+        const st = settings[0];
+        // Với app dùng 1 mình trên cùng máy, local cache là bản gần nhất nếu sync settings từng fail.
+        if (!localCache.shop) nextShop = safeJson(st.shop, nextShop);
+        if (!localCache.topics) nextTopics = safeJson(st.topics, nextTopics);
       }
-      // Chỉ xoá phantom ORDERS (không custId) - an toàn
-      await cleanPhantomOrders(ords);
-      // KHÔNG auto-xoá customers vì custId có thể bị lowercase
-      // User dùng nút 🧹 thủ công trong Cài Đặt
+      setShop(nextShop);
+      setTopics(nextTopics);
+
+      // Tuyệt đối không auto-delete khi load. Chỉ detect để người dùng tự dọn nếu cần.
+      const phantomOrders = detectPhantomOrders(ordsRaw);
+      if (phantomOrders.length) console.warn("Detected phantom orders, not deleting:", phantomOrders.length);
+
       setDbReady(true);
+      writeLocalCache({services:mergedServices, customers:mergedCustomers, orders:mergedOrders, bookings:mergedBookings, replies:mergedReplies, shop:nextShop, topics:nextTopics});
+
+      retryMissingAndDirtySync(
+        {services:mergedServices, customers:mergedCustomers, orders:mergedOrders, bookings:mergedBookings, replies:mergedReplies},
+        {services:cloudServices, customers:cloudCustomers, orders:cloudOrders, bookings:cloudBookings, replies:cloudReplies}
+      ).catch(e=>console.warn("Retry dirty sync error:", e));
+      if ((readDirtyQueue().shop_settings || []).includes("singleton") || !settings.length) {
+        sb.upsert("shop_settings", {id:"singleton", shop:JSON.stringify(nextShop), topics:JSON.stringify(nextTopics)})
+          .then(()=>clearDirty("shop_settings", "singleton"))
+          .catch(e=>{ console.warn("Retry settings sync failed", e); markDirty("shop_settings", "singleton"); });
+      }
     } catch(e) {
       console.error("Load error:", e);
-      toast("⚠️ Không tải được data từ cloud — dùng data mẫu tạm thời");
+      const localCache = readLocalCache();
+      if (localCache) {
+        setServices(normalizeServices(localCache.services || []));
+        setCustomers(normalizeCustomers(localCache.customers || []));
+        setOrders(normalizeOrders(localCache.orders || []));
+        setBookings(normalizeBookings(localCache.bookings || []));
+        setReplies(normalizeReplies(localCache.replies || []));
+        setShop(localCache.shop || DEFAULT_SHOP);
+        setTopics(localCache.topics || ["Tình yêu","Hôn nhân / Ex","Sự nghiệp","Tài chính","Gia đình","Sức khỏe","Tổng quát"]);
+        toast("⚠️ Không tải được cloud — đang dùng bản lưu trong máy");
+      } else {
+        toast("⚠️ Không tải được cloud và chưa có cache trong máy");
+      }
       setDbReady(true);
     }
     setSyncing(false);
   };
 
   useEffect(() => { if (auth && !dbReady) loadFromDb(); }, [auth, dbReady]);
+
+  // Local fallback cache: giúp dữ liệu không mất khi Supabase sync fail hoặc refresh quá nhanh
+  useEffect(() => {
+    if (!auth || !dbReady) return;
+    writeLocalCache({services, customers, orders, bookings, replies, shop, topics});
+  }, [auth, dbReady, services, customers, orders, bookings, replies, shop, topics]);
 
   // ── Auto-sync helpers ─────────────────────────────────────────────────
   const syncSettings = async (newShop, newTopics) => {
@@ -3186,7 +3372,12 @@ export default function App() {
         shop: JSON.stringify(newShop),
         topics: JSON.stringify(newTopics),
       });
-    } catch(e) { console.error("Sync settings:", e); }
+      clearDirty("shop_settings", "singleton");
+    } catch(e) {
+      console.error("Sync settings:", e);
+      markDirty("shop_settings", "singleton");
+      toast("⚠️ Cài đặt chưa lưu lên cloud. Đã giữ tạm trong máy.");
+    }
   };
 
   // Wrapped setters that also sync to Supabase
@@ -3214,7 +3405,7 @@ export default function App() {
       const prevIds = prev.map(s=>s.id);
       const nextIds = next.map(s=>s.id);
       // Upsert all
-      next.forEach(s => sb.upsert("services", s).catch(console.error));
+      next.forEach(s => sb.upsert("services", rowForService(s)).then(()=>clearDirty("services", s.id)).catch(e=>{ console.error("Sync service:", e); markDirty("services", s.id); toast("⚠️ Dịch vụ chưa lưu lên cloud. Đã giữ tạm trong máy."); }));
       // Delete removed
       prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("services", id).catch(console.error));
       return next;
@@ -3227,14 +3418,8 @@ export default function App() {
       if (!dbReady) return next;
       const prevIds = prev.map(c=>c.id);
       const nextIds = next.map(c=>c.id);
-      next.forEach(c => sb.upsert("customers", {
-        id: c.id, name: c.name||"", nick: c.nick||"",
-        phone: c.phone||"", social: c.social||"",
-        tags: c.tags||[], notes: c.notes||"", ava: c.ava||"🌙",
-        created: c.created||"", "lastOrder": c.lastOrder||"",
-        archived: !!c.archived,
-      }).catch(console.error));
-      prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("customers", id).catch(console.error));
+      next.forEach(c => sb.upsert("customers", rowForCustomer(c)).then(()=>clearDirty("customers", c.id)).catch(e => { console.error("Sync customer:", e); markDirty("customers", c.id); toast("⚠️ Khách chưa lưu lên cloud. Đã giữ tạm trong máy."); }));
+      prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("customers", id).catch(e => { console.error("Delete customer:", e); toast("⚠️ Không xoá được khách trên cloud."); }));
       return next;
     });
   };
@@ -3255,8 +3440,8 @@ export default function App() {
         notes: b.notes||"",
         "orderId": b.orderId||null,
         "customerSnapshot": b.customerSnapshot ? JSON.stringify(b.customerSnapshot) : null,
-      }).catch(console.error));
-      prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("bookings", id).catch(console.error));
+      }).then(()=>clearDirty("bookings", b.id)).catch(e=>{ console.error("Sync booking:", e); markDirty("bookings", b.id); toast("⚠️ Booking chưa lưu lên cloud. Đã giữ tạm trong máy."); }));
+      prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("bookings", id).catch(e=>{ console.error("Delete booking:", e); toast("⚠️ Không xoá được booking trên cloud."); }));
       return next;
     });
   };
@@ -3267,8 +3452,8 @@ export default function App() {
       if (!dbReady) return next;
       const prevIds = prev.map(r=>r.id);
       const nextIds = next.map(r=>r.id);
-      next.forEach(r => sb.upsert("replies", {...r, images: JSON.stringify(r.images||[])}).catch(console.error));
-      prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("replies", id).catch(console.error));
+      next.forEach(r => sb.upsert("replies", rowForReply(r)).then(()=>clearDirty("replies", r.id)).catch(e=>{ console.error("Sync reply:", e); markDirty("replies", r.id); toast("⚠️ Tin mẫu chưa lưu lên cloud. Đã giữ tạm trong máy."); }));
+      prevIds.filter(id=>!nextIds.includes(id)).forEach(id => sb.delete("replies", id).catch(e=>{ console.error("Delete reply:", e); toast("⚠️ Không xoá được tin mẫu trên cloud."); }));
       return next;
     });
   };
@@ -3285,58 +3470,52 @@ export default function App() {
       // Tính lại lastOrder từ orders thật (không dùng ngày đơn vừa sửa)
       const allOrds = [...orders.filter(x=>x.id!==o.id&&x.custId===cid), o]
         .filter(x=>x.status!=="cancel"&&x.date);
-      const latest = allOrds.sort((a,b)=>{
-        const p = s=>{const [d,m,y]=(s||"").split("/").map(Number);return new Date(y,m-1,d).getTime();};
-        return p(b.date)-p(a.date);
-      })[0]?.date||"";
+      const latest = allOrds.sort((a,b)=>parseVnDateMs(b.date)-parseVnDateMs(a.date))[0]?.date||"";
       return {...c, lastOrder:latest};
     }));
     try {
       if (!o.id) return;
-      // Không lưu đơn nếu không có custId hợp lệ
-      if (!o.custId || o.custId.trim() === "") { 
-        console.warn("saveOrder: missing custId, skip"); return; 
+      // Cho phép lưu đơn có customerSnapshot dù custId đã bị xoá/không còn tồn tại.
+      if ((!o.custId || String(o.custId).trim() === "") && !o.customerSnapshot) {
+        console.warn("saveOrder: missing custId and customerSnapshot, keep local only");
+        markDirty("orders", o.id);
+        return;
       }
-      const orderRow = {
-        id: o.id,
-        "custId": o.custId||null,
-        items: JSON.stringify(o.items||[]),
-        "extraQ": o.extraQ||0,
-        total: o.total||0,
-        tips: o.tips||0,
-        status: o.status||"new",
-        date: o.date||"",
-        time: o.time||"",
-        notes: o.notes||"",
-        customerSnapshot: o.customerSnapshot ? JSON.stringify(o.customerSnapshot) : null,
-      };
+      const orderRow = rowForOrder(o);
       await sb.upsert("orders", orderRow);
+      clearDirty("orders", o.id);
       if (o.custId) {
-        await sb.update("customers", o.custId, { "lastOrder": o.date });
+        const latest = getLatestOrderDateFromList([...orders.filter(x=>x.id!==o.id), o], o.custId);
+        await sb.update("customers", o.custId, { "lastOrder": latest }).catch(()=>{});
       }
-    } catch(e) { console.error("Save order:", e); }
+    } catch(e) { console.error("Save order:", e); markDirty("orders", o.id); toast("⚠️ Đơn chưa lưu lên cloud. Đã giữ tạm trong máy."); }
   };
 
   const deleteOrder = async (id) => {
-    // DB trước, local sau + rollback nếu fail
+    // DB trước, local sau + cập nhật lại lastOrder để không làm sai follow-up
+    const oldOrder = orders.find(o=>o.id===id);
     try {
       await sb.delete("orders", id);
-      setOrders(p=>p.filter(o=>o.id!==id));
+      const nextOrders = orders.filter(o=>o.id!==id);
+      setOrders(nextOrders);
+      if (oldOrder?.custId) {
+        const latest = getLatestOrderDateFromList(nextOrders, oldOrder.custId);
+        setCustomers(p=>p.map(c=>c.id===oldOrder.custId?{...c,lastOrder:latest}:c));
+        await sb.update("customers", oldOrder.custId, {"lastOrder": latest}).catch(()=>{});
+      }
     } catch(e) {
       console.error("Delete order:", e);
       toast("⚠️ Không xoá được đơn. Thử lại!");
     }
   };
 
-  // Xoá phantom orders (không có custId) khỏi DB
-  const cleanPhantomOrders = async (ords) => {
-    const phantom = ords.filter(o => {
+  // Detect phantom orders; KHÔNG tự xoá khi load để tránh mất dữ liệu.
+  const detectPhantomOrders = (ords) => {
+    return (ords || []).filter(o => {
       const cid = o.custId || o["custId"] || o.custid || "";
-      return !cid || cid.trim() === "";
+      const snap = safeJson(o.customerSnapshot || o.customersnapshot, null);
+      return (!cid || String(cid).trim() === "") && !snap;
     });
-    if (phantom.length === 0) return;
-    console.log(`Cleaning ${phantom.length} phantom orders...`);
-    await Promise.all(phantom.map(o => sb.delete("orders", o.id).catch(console.error)));
   };
 
   // Detect customers không có đơn (chỉ detect, không xoá tự động)
@@ -3399,19 +3578,22 @@ export default function App() {
 
       if (svcs.length) setServicesAndSync(prev => [...prev.filter(x=>!svcs.some(y=>y.id===x.id)), ...svcs]);
       if (custs.length) setCustomersAndSync(prev => [...prev.filter(x=>!custs.some(y=>y.id===x.id)), ...custs]);
-      if (ords.length)  { setOrders(prev => [...ords, ...prev.filter(x=>!ords.some(y=>y.id===x.id))]); ords.forEach(x=>sb.upsert("orders",{...x,items:JSON.stringify(x.items||[])}).catch(console.error)); }
+      if (ords.length)  {
+        setOrders(prev => [...ords, ...prev.filter(x=>!ords.some(y=>y.id===x.id))]);
+        ords.forEach(x=>sb.upsert("orders", rowForOrder(x)).then(()=>clearDirty("orders", x.id)).catch(e=>{ console.error("Import order sync:", e); markDirty("orders", x.id); }));
+      }
       if (bks.length)   setBookingsAndSync(prev => [...prev.filter(x=>!bks.some(y=>y.id===x.id)), ...bks]);
-      if (reps.length)  setReplies(prev => [...prev.filter(x=>!reps.some(y=>y.id===x.id)), ...reps]);
+      if (reps.length)  setRepliesAndSync(prev => [...prev.filter(x=>!reps.some(y=>y.id===x.id)), ...reps]);
       if (st?.shop)   setShop(safeJson(st.shop, shop));
       if (st?.topics) setTopics(safeJson(st.topics, topics));
 
       if (dbReady) {
         await Promise.all([
-          ...svcs.map(x => sb.upsert("services", x)),
-          ...custs.map(x => sb.upsert("customers", x)),
-          ...ords.map(x => sb.upsert("orders", {...x, items:JSON.stringify(x.items||[])})),
-          ...bks.map(x => sb.upsert("bookings", x)),
-          ...reps.map(x => sb.upsert("replies", {...x, images:JSON.stringify(x.images||[])})),
+          ...svcs.map(x => sb.upsert("services", rowForService(x)).then(()=>clearDirty("services", x.id))),
+          ...custs.map(x => sb.upsert("customers", rowForCustomer(x)).then(()=>clearDirty("customers", x.id))),
+          ...ords.map(x => sb.upsert("orders", rowForOrder(x)).then(()=>clearDirty("orders", x.id))),
+          ...bks.map(x => sb.upsert("bookings", rowForBooking(x)).then(()=>clearDirty("bookings", x.id))),
+          ...reps.map(x => sb.upsert("replies", rowForReply(x)).then(()=>clearDirty("replies", x.id))),
           st ? sb.upsert("shop_settings", {id:"singleton", shop:st.shop || JSON.stringify(shop), topics:st.topics || JSON.stringify(topics)}) : Promise.resolve(),
         ]);
       }
@@ -3491,14 +3673,22 @@ export default function App() {
           <SyncBanner/>
           {toastMsg&&<div className="toast">{toastMsg}</div>}
           <input ref={importExcelRef} type="file" accept=".xlsx,.xls" style={{display:"none"}} onChange={e=>importExcel(e.target.files?.[0])}/>
-          {pages[page]||pages.dashboard}
-          <nav className="bnav">
+          {!dbReady ? (
+            <div className="login-bg">
+              <div style={{fontSize:72, marginBottom:16}}>🐸</div>
+              <div style={{fontFamily:"Nunito",fontWeight:900,fontSize:22,color:T.ink}}>Đang tải dữ liệu...</div>
+              <div style={{fontSize:13,color:T.muted,marginTop:8,fontWeight:700}}>Đợi xong rồi hãy tạo khách/đơn mới để tránh mất sync.</div>
+            </div>
+          ) : (
+            pages[page]||pages.dashboard
+          )}
+          {dbReady && <nav className="bnav">
             {NAV_ITEMS.map(n=>(
               <button key={n.id} className={`nb ${page===n.id?"on":""}`} onClick={()=>setPage(n.id)}>
                 {n.ico()}<span>{n.l}</span>
               </button>
             ))}
-          </nav>
+          </nav>}
         </div>
       )}
     </>
