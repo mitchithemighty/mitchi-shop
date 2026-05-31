@@ -1,6 +1,6 @@
 {
   "name": "Mitchi Shop Manager",
-  "short_name": "Mitchi",
+  "short_name": "Mitchi Shop",
   "description": "Quản lý shop Tarot & Lenormand",
   "start_url": "/?v=26",
   "scope": "/",
