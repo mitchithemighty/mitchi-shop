@@ -2494,12 +2494,17 @@ function PwaInfo({onClose}) {
         <DragHandle/>
         <div className="sheet-title">📱 Cài như app (PWA)</div>
         <div className="card card-green" style={{marginBottom:14,display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:56,height:56,borderRadius:16,background:T.yellow,border:`2px solid ${T.ink}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,boxShadow:`3px 3px 0 ${T.ink}`}}>🐸</div>
+          <img src="/icon-192.png?v=23" alt="Mitchi app icon" style={{width:56,height:56,borderRadius:16,border:`2px solid ${T.ink}`,boxShadow:`3px 3px 0 ${T.ink}`,background:T.yellow}}/>
           <div>
             <div style={{fontWeight:700,marginBottom:6}}>✅ App đã sẵn sàng cài!</div>
             <div style={{fontSize:13,color:T.muted,lineHeight:1.6}}>Icon app dùng emoji 🐸 hệ thống trên nền vàng. Link: <strong>mitchi-shop.vercel.app</strong></div>
           </div>
         </div>
+        <button className="btn btn-yellow" style={{marginBottom:14}} onClick={()=>{
+          if (typeof window !== "undefined" && window.mitchiInstallApp) window.mitchiInstallApp();
+        }}>
+          🐸 Thêm nhanh vào màn hình chính
+        </button>
         {[
           {ico:"🍎",title:"iPhone / iPad (Safari)",steps:["Mở Safari → vào link app","Nhấn nút chia sẻ ⬆️ ở dưới","Chọn 'Thêm vào màn hình chính'","Nhấn 'Thêm' — xong! 🎉"]},
           {ico:"🤖",title:"Android (Chrome)",steps:["Mở Chrome → vào link app","Nhấn menu ⋮ góc trên phải","Chọn 'Thêm vào màn hình chính'","Nhấn 'Thêm' — xong! 🎉"]},
@@ -3020,7 +3025,7 @@ const NAV_ITEMS = [
   {id:"settings", l:"Cài đặt",ico:()=>I.cog},
 ];
 
-const APP_VERSION = "v22-frog-icon";
+const APP_VERSION = "v23-static-frog-icon";
 
 const DEFAULT_SHOP = {
   name:     "Mitchi The Mighty",
@@ -3040,54 +3045,85 @@ const DEFAULT_SHOP = {
 
 // Load html2canvas for PNG export
 if (typeof window !== "undefined") {
-  // Add PWA manifest if not present
-  // Icon dùng emoji 🐸 từ font/emoji hệ thống, không dùng hình tự chế.
-  const makeEmojiIcon = (bg = "#F5C842", size = 512) => {
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-        <rect width="${size}" height="${size}" rx="112" fill="${bg}"/>
-        <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle"
-          font-size="${Math.round(size * 0.58)}"
-          font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif">🐸</text>
-      </svg>`;
-    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  // Static PWA metadata. Use real PNG files in /public so Android/iOS do not fall back to Vercel triangle.
+  // The icon PNGs are generated from the system Noto Color Emoji glyph 🐸, not hand-drawn.
+  const upsertHead = (selector, create) => {
+    let el = document.querySelector(selector);
+    if (!el) {
+      el = create();
+      document.head.appendChild(el);
+    }
+    return el;
   };
-  const frogIconYellow = makeEmojiIcon("#F5C842", 512);
-  const frogIconBlue = makeEmojiIcon("#5BC8F5", 512);
 
-  if (!document.querySelector('link[rel="manifest"]')) {
-    const manifestData = {
-      name: "Mitchi Shop Manager",
-      short_name: "Mitchi",
-      description: "Quản lý shop Tarot & Lenormand",
-      start_url: "/",
-      scope: "/",
-      display: "standalone",
-      background_color: "#EFF9F0",
-      theme_color: "#F5C842",
-      icons: [
-        { src: frogIconYellow, sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
-        { src: frogIconYellow, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" },
-        { src: frogIconBlue, sizes: "512x512", type: "image/svg+xml", purpose: "any" }
-      ]
-    };
-    const blob = new Blob([JSON.stringify(manifestData)],{type:"application/json"});
-    const url = URL.createObjectURL(blob);
+  const manifestLink = upsertHead('link[rel="manifest"]', () => {
     const link = document.createElement("link");
-    link.rel = "manifest"; link.href = url;
-    document.head.appendChild(link);
-  }
-  if (!document.querySelector('link[rel="apple-touch-icon"]')) {
-    const appleIcon = document.createElement("link");
-    appleIcon.rel = "apple-touch-icon";
-    appleIcon.href = frogIconYellow;
-    document.head.appendChild(appleIcon);
-  }
-  if (!document.querySelector('meta[name="theme-color"]')) {
-    const theme = document.createElement("meta");
-    theme.name = "theme-color";
-    theme.content = "#F5C842";
-    document.head.appendChild(theme);
+    link.rel = "manifest";
+    return link;
+  });
+  manifestLink.href = "/manifest.webmanifest?v=23";
+
+  const appleIcon = upsertHead('link[rel="apple-touch-icon"]', () => {
+    const link = document.createElement("link");
+    link.rel = "apple-touch-icon";
+    return link;
+  });
+  appleIcon.href = "/apple-touch-icon.png?v=23";
+
+  const icon32 = upsertHead('link[rel="icon"][sizes="32x32"]', () => {
+    const link = document.createElement("link");
+    link.rel = "icon";
+    link.sizes = "32x32";
+    link.type = "image/png";
+    return link;
+  });
+  icon32.href = "/favicon-32x32.png?v=23";
+
+  const shortcutIcon = upsertHead('link[rel="shortcut icon"]', () => {
+    const link = document.createElement("link");
+    link.rel = "shortcut icon";
+    return link;
+  });
+  shortcutIcon.href = "/favicon.ico?v=23";
+
+  const theme = upsertHead('meta[name="theme-color"]', () => {
+    const meta = document.createElement("meta");
+    meta.name = "theme-color";
+    return meta;
+  });
+  theme.content = "#F5C842";
+
+  const appleCapable = upsertHead('meta[name="apple-mobile-web-app-capable"]', () => {
+    const meta = document.createElement("meta");
+    meta.name = "apple-mobile-web-app-capable";
+    return meta;
+  });
+  appleCapable.content = "yes";
+
+  const appleTitle = upsertHead('meta[name="apple-mobile-web-app-title"]', () => {
+    const meta = document.createElement("meta");
+    meta.name = "apple-mobile-web-app-title";
+    return meta;
+  });
+  appleTitle.content = "Mitchi";
+
+  if (!window.__mitchiInstallHooked) {
+    window.__mitchiInstallHooked = true;
+    window.__mitchiDeferredInstallPrompt = null;
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      window.__mitchiDeferredInstallPrompt = e;
+    });
+    window.mitchiInstallApp = async () => {
+      const promptEvent = window.__mitchiDeferredInstallPrompt;
+      if (promptEvent) {
+        promptEvent.prompt();
+        try { await promptEvent.userChoice; } catch {}
+        window.__mitchiDeferredInstallPrompt = null;
+      } else {
+        alert("Nếu nút cài nhanh chưa hiện: trên Android Chrome hãy bấm menu ⋮ → Thêm vào màn hình chính. Trên iPhone Safari bấm Chia sẻ ⬆️ → Thêm vào màn hình chính. Nếu vẫn thấy icon Vercel, xoá shortcut cũ rồi thêm lại.");
+      }
+    };
   }
   if (!window.html2canvas) {
     const s = document.createElement("script");
