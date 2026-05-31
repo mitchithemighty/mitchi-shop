@@ -2493,9 +2493,12 @@ function PwaInfo({onClose}) {
       <div className="sheet">
         <DragHandle/>
         <div className="sheet-title">📱 Cài như app (PWA)</div>
-        <div className="card card-green" style={{marginBottom:14}}>
-          <div style={{fontWeight:700,marginBottom:6}}>✅ App đã sẵn sàng cài!</div>
-          <div style={{fontSize:13,color:T.muted,lineHeight:1.6}}>Link: <strong>mitchi-shop.vercel.app</strong></div>
+        <div className="card card-green" style={{marginBottom:14,display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:56,height:56,borderRadius:16,background:T.yellow,border:`2px solid ${T.ink}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,boxShadow:`3px 3px 0 ${T.ink}`}}>🐸</div>
+          <div>
+            <div style={{fontWeight:700,marginBottom:6}}>✅ App đã sẵn sàng cài!</div>
+            <div style={{fontSize:13,color:T.muted,lineHeight:1.6}}>Icon app dùng emoji 🐸 hệ thống trên nền vàng. Link: <strong>mitchi-shop.vercel.app</strong></div>
+          </div>
         </div>
         {[
           {ico:"🍎",title:"iPhone / iPad (Safari)",steps:["Mở Safari → vào link app","Nhấn nút chia sẻ ⬆️ ở dưới","Chọn 'Thêm vào màn hình chính'","Nhấn 'Thêm' — xong! 🎉"]},
@@ -2608,6 +2611,8 @@ function SettingsPage({logout, toast, services, setServices, orders, shop, setSh
             <div style={{fontSize:12,color:T.muted}}>{shop.tagline}</div>
           </div>
         </div>
+
+        <div style={{fontSize:10,color:T.muted,fontWeight:800,letterSpacing:1,textTransform:"uppercase",margin:"-6px 0 12px",textAlign:"right"}}>Phiên bản: {APP_VERSION}</div>
 
         <ServiceManager services={services} setServices={setServices} orders={orders} toast={toast}/>
 
@@ -3015,6 +3020,8 @@ const NAV_ITEMS = [
   {id:"settings", l:"Cài đặt",ico:()=>I.cog},
 ];
 
+const APP_VERSION = "v22-frog-icon";
+
 const DEFAULT_SHOP = {
   name:     "Mitchi The Mighty",
   tagline:  "Tarot and Lenormand Reader",
@@ -3034,18 +3041,34 @@ const DEFAULT_SHOP = {
 // Load html2canvas for PNG export
 if (typeof window !== "undefined") {
   // Add PWA manifest if not present
+  // Icon dùng emoji 🐸 từ font/emoji hệ thống, không dùng hình tự chế.
+  const makeEmojiIcon = (bg = "#F5C842", size = 512) => {
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        <rect width="${size}" height="${size}" rx="112" fill="${bg}"/>
+        <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle"
+          font-size="${Math.round(size * 0.58)}"
+          font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif">🐸</text>
+      </svg>`;
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  };
+  const frogIconYellow = makeEmojiIcon("#F5C842", 512);
+  const frogIconBlue = makeEmojiIcon("#5BC8F5", 512);
+
   if (!document.querySelector('link[rel="manifest"]')) {
     const manifestData = {
       name: "Mitchi Shop Manager",
       short_name: "Mitchi",
       description: "Quản lý shop Tarot & Lenormand",
       start_url: "/",
+      scope: "/",
       display: "standalone",
       background_color: "#EFF9F0",
-      theme_color: "#1A2E1F",
+      theme_color: "#F5C842",
       icons: [
-        { src: "/images/logo.jpg", sizes: "192x192", type: "image/jpeg", purpose: "any maskable" },
-        { src: "/images/logo.jpg", sizes: "512x512", type: "image/jpeg", purpose: "any" }
+        { src: frogIconYellow, sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
+        { src: frogIconYellow, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" },
+        { src: frogIconBlue, sizes: "512x512", type: "image/svg+xml", purpose: "any" }
       ]
     };
     const blob = new Blob([JSON.stringify(manifestData)],{type:"application/json"});
@@ -3053,6 +3076,18 @@ if (typeof window !== "undefined") {
     const link = document.createElement("link");
     link.rel = "manifest"; link.href = url;
     document.head.appendChild(link);
+  }
+  if (!document.querySelector('link[rel="apple-touch-icon"]')) {
+    const appleIcon = document.createElement("link");
+    appleIcon.rel = "apple-touch-icon";
+    appleIcon.href = frogIconYellow;
+    document.head.appendChild(appleIcon);
+  }
+  if (!document.querySelector('meta[name="theme-color"]')) {
+    const theme = document.createElement("meta");
+    theme.name = "theme-color";
+    theme.content = "#F5C842";
+    document.head.appendChild(theme);
   }
   if (!window.html2canvas) {
     const s = document.createElement("script");
