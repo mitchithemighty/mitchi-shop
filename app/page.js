@@ -1007,10 +1007,11 @@ function CustomersPage({customers, setCustomers, orders, setOrders, bookings, se
   const [search,  setSearch]  = useState("");
   const [form,    setForm]    = useState({name:"",nick:"",phone:"",social:"",notes:"",ava:"🌙",created:todayStr()});
 
-  const custOrders = id => orders.filter(o=>o.custId===id);
+  const custOrders = id => { const c = customers.find(x=>x.id===id); return orders.filter(o=>orderBelongsToCustomer(o,c)); };
   // Lấy ngày đơn mới nhất (không huỷ) từ orders thật
   const getLatestOrdDate = id => {
-    const valid = orders.filter(o=>o.custId===id&&o.status!=="cancel"&&o.date);
+    const c0 = customers.find(x=>x.id===id);
+    const valid = orders.filter(o=>orderBelongsToCustomer(o,c0)&&o.status!=="cancel"&&o.date);
     if(!valid.length) return "";
     return valid.sort((a,b)=>{
       const parse = s=>{ const [d,m,y]=s.split("/").map(Number); return new Date(y,m-1,d).getTime(); };
@@ -1062,7 +1063,7 @@ function CustomersPage({customers, setCustomers, orders, setOrders, bookings, se
     const c = actionSheet;
     if(!c) return;
     const snap = {name:c.name,nick:c.nick||"",phone:c.phone||"",ava:c.ava||"🌙"};
-    const custOrds = orders.filter(o=>o.custId===c.id);
+    const custOrds = orders.filter(o=>orderBelongsToCustomer(o,c));
 
     if(choice===1) {
       // Lưu trữ
@@ -1071,7 +1072,7 @@ function CustomersPage({customers, setCustomers, orders, setOrders, bookings, se
       toast("📦 Đã lưu trữ khách!");
     } else if(choice===2) {
       // Xoá khách, giữ đơn + booking có snapshot — Supabase TRƯỚC, local SAU
-      const custBks = bookings.filter(b=>b.custId===c.id);
+      const custBks = bookings.filter(b=>bookingBelongsToCustomer(b,c));
       if(!window.confirm("Xoá khách nhưng giữ lại "+custOrds.length+" đơn và "+custBks.length+" booking?\nĐơn/booking sẽ hiển thị tên từ snapshot.")) return;
       try {
         // Bước 1: Update snapshot trên Supabase
@@ -1083,8 +1084,8 @@ function CustomersPage({customers, setCustomers, orders, setOrders, bookings, se
         await sbFetch("/customers?id=eq."+c.id,{method:"DELETE",prefer:""});
         markDeleted("customers", c.id);
         // Bước 3: Chỉ khi DB thành công mới update local state
-        setOrders(p=>p.map(o=>o.custId===c.id?{...o,customerSnapshot:snap}:o));
-        setBookings(p=>p.map(b=>b.custId===c.id?{...b,customerSnapshot:snap}:b));
+        setOrders(p=>p.map(o=>orderBelongsToCustomer(o,c)?{...o,customerSnapshot:snap}:o));
+        setBookings(p=>p.map(b=>bookingBelongsToCustomer(b,c)?{...b,customerSnapshot:snap}:b));
         setCustomers(p=>p.filter(x=>x.id!==c.id));
         toast("🗑 Đã xoá khách, giữ lại đơn và booking!");
       } catch(e) {
@@ -1104,11 +1105,11 @@ function CustomersPage({customers, setCustomers, orders, setOrders, bookings, se
         ]);
         markDeleted("customers", c.id);
         custOrds.forEach(o=>markDeleted("orders", o.id));
-        bookings.filter(b=>b.custId===c.id).forEach(b=>markDeleted("bookings", b.id));
+        bookings.filter(b=>bookingBelongsToCustomer(b,c)).forEach(b=>markDeleted("bookings", b.id));
         // Chỉ update local khi DB thành công
         setCustomers(p=>p.filter(x=>x.id!==c.id));
-        setOrders(p=>p.filter(o=>o.custId!==c.id));
-        setBookings(p=>p.filter(b=>b.custId!==c.id));
+        setOrders(p=>p.filter(o=>!orderBelongsToCustomer(o,c)));
+        setBookings(p=>p.filter(b=>!bookingBelongsToCustomer(b,c)));
         toast("💣 Đã xoá toàn bộ!");
       } catch(e) {
         console.error(e);
@@ -1195,7 +1196,7 @@ Chỉ xoá khách KHÔNG có đơn và KHÔNG có booking. Không xoá khách đ
           <div style={{fontSize:28}}>{actionSheet.ava||"🌙"}</div>
           <div>
             <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{actionSheet.name}</div>
-            <div style={{fontSize:12,color:T.muted}}>{orders.filter(o=>o.custId===actionSheet.id).length} đơn liên quan</div>
+            <div style={{fontSize:12,color:T.muted}}>{orders.filter(o=>orderBelongsToCustomer(o,actionSheet)).length} đơn liên quan</div>
           </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -1408,7 +1409,7 @@ Chỉ xoá khách KHÔNG có đơn và KHÔNG có booking. Không xoá khách đ
               <div style={{fontSize:28}}>{actionSheet.ava||"🌙"}</div>
               <div>
                 <div style={{fontFamily:"Nunito",fontWeight:800,fontSize:15}}>{actionSheet.name}</div>
-                <div style={{fontSize:12,color:T.muted}}>{orders.filter(o=>o.custId===actionSheet.id).length} đơn liên quan</div>
+                <div style={{fontSize:12,color:T.muted}}>{orders.filter(o=>orderBelongsToCustomer(o,actionSheet)).length} đơn liên quan</div>
               </div>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -2882,10 +2883,11 @@ function Dashboard({nav, orders, setOrders, saveOrder, customers, services, book
   const pendingTodayBks = todayBks.filter(b=>b.status==="pending");
   const pendingBks = pendingTodayBks.length;
 
-  const custOrders = id => orders.filter(o=>o.custId===id);
+  const custOrders = id => { const c = customers.find(x=>x.id===id); return orders.filter(o=>orderBelongsToCustomer(o,c)); };
   // Lấy ngày đơn mới nhất (không huỷ) từ orders thật
   const getLatestOrdDate = id => {
-    const valid = orders.filter(o=>o.custId===id&&o.status!=="cancel"&&o.date);
+    const c0 = customers.find(x=>x.id===id);
+    const valid = orders.filter(o=>orderBelongsToCustomer(o,c0)&&o.status!=="cancel"&&o.date);
     if(!valid.length) return "";
     return valid.sort((a,b)=>{
       const parse = s=>{ const [d,m,y]=s.split("/").map(Number); return new Date(y,m-1,d).getTime(); };
@@ -3236,7 +3238,7 @@ const NAV_ITEMS = [
   {id:"settings", l:"Cài đặt",ico:()=>I.cog},
 ];
 
-const APP_VERSION = "v31-hard-phantom-clean";
+const APP_VERSION = "v32-self-audited-datafix";
 
 const DEFAULT_SHOP = {
   name:     "Mitchi The Mighty",
@@ -3452,9 +3454,27 @@ const isWeakCustomerText = v => {
   if (/^(test|tst|khach|khách|demo)[\s\-_#]*\d*$/i.test(x)) return true;
   return false;
 };
+const digitsOnly = v => String(v || "").replace(/\D/g, "");
+const customerMatchesSnapshot = (c, snap = {}) => {
+  if (!c || !snap) return false;
+  const cPhone = digitsOnly(c.phone || c.social);
+  const sPhone = digitsOnly(snap.phone || snap.social);
+  if (cPhone && sPhone && cPhone === sPhone) return true;
+  const names = [c.name, c.nick].map(normText).filter(Boolean);
+  const snaps = [snap.name, snap.nick].map(normText).filter(Boolean);
+  return names.some(n => snaps.includes(n));
+};
+const orderBelongsToCustomer = (o, c) => {
+  if (!o || !c) return false;
+  return o.custId === c.id || customerMatchesSnapshot(c, o.customerSnapshot);
+};
+const bookingBelongsToCustomer = (b, c) => {
+  if (!b || !c) return false;
+  return b.custId === c.id || customerMatchesSnapshot(c, b.customerSnapshot);
+};
 const hasCustomerActivity = (c, orders = [], bookings = []) => {
   if (!c?.id) return false;
-  return (orders || []).some(o => o.custId === c.id) || (bookings || []).some(b => b.custId === c.id);
+  return (orders || []).some(o => orderBelongsToCustomer(o, c)) || (bookings || []).some(b => bookingBelongsToCustomer(b, c));
 };
 const isMeaningfulCustomer = c => !!String(c?.name || c?.nick || c?.phone || c?.social || "").trim();
 // Phantom rõ ràng = không có đơn/booking và thông tin rỗng/yếu/test.
@@ -3580,9 +3600,9 @@ export default function App() {
   const [page,           setPage]          = useState("dashboard");
   const [toastMsg,       setToast]         = useState("");
   const [services,       setServices]      = useState(SEED_SVCS);
-  const [customers,      setCustomers]     = useState(SEED_CUSTS);
-  const [orders,         setOrders]        = useState(SEED_ORDERS);
-  const [bookings,       setBookings]      = useState(SEED_BOOKINGS);
+  const [customers,      setCustomers]     = useState([]);
+  const [orders,         setOrders]        = useState([]);
+  const [bookings,       setBookings]      = useState([]);
   const [defCustId,      setDefCustId]     = useState(null);
   const [highlightOrder, setHighlightOrder]= useState(null);
   const [shop,      setShop]      = useState(DEFAULT_SHOP);
@@ -3607,7 +3627,7 @@ export default function App() {
     tags:safeJson(c.tags, []),
     archived:c.archived===true||c.archived==="true"||c.archived===1||c.archived==="1",
     lastOrder:c.lastOrder || c.lastorder || "",
-  })).filter(x=>x.id && isMeaningfulCustomer(x));
+  })).filter(x=>x.id && !isDeleted("customers", x.id) && isMeaningfulCustomer(x));
 
   const normalizeOrders = (rows) => (rows || []).filter(Boolean).map(o => ({
     ...o,
