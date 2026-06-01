@@ -1129,6 +1129,17 @@ function CustomersPage({customers, setCustomers, orders, setOrders, bookings, se
 
   const phantomCustomers = customers.filter(c => isClearlyPhantomCustomer(c, orders, bookings));
   const noActivityCustomers = customers.filter(c => !c.archived && !hasCustomerActivity(c, orders, bookings));
+  const hardDeleteCustomers = async (list, label = "khách") => {
+    const ids = new Set((list || []).map(c => c.id).filter(Boolean));
+    if (!ids.size) { toast("✅ Không có khách nào cần dọn."); return; }
+    // Tombstone trước để cache/cloud cũ không hồi sinh lại sau reload.
+    list.forEach(c => markDeleted("customers", c.id));
+    setCustomers(p => p.filter(c => !ids.has(c.id)));
+    const results = await Promise.allSettled(list.map(c => sbFetch("/customers?id=eq."+c.id, {method:"DELETE", prefer:""})));
+    const failed = results.filter(r => r.status === "rejected").length;
+    toast(failed ? `🧹 Đã ẩn ${list.length} ${label} khỏi app. ${failed} khách chưa xoá được trên cloud nhưng sẽ không hồi sinh lại.` : `🧹 Đã dọn ${list.length} ${label}!`);
+  };
+
   const cleanPhantomCustomersNow = async (singleId = null) => {
     const list = (singleId ? customers.filter(c => c.id === singleId) : customers)
       .filter(c => isClearlyPhantomCustomer(c, orders, bookings));
@@ -1138,12 +1149,30 @@ function CustomersPage({customers, setCustomers, orders, setOrders, bookings, se
 ${preview}${list.length>10?"...":""}
 
 Chỉ xoá khách KHÔNG có đơn, KHÔNG có booking, và thông tin trống/yếu/test.`)) return;
-    // Mark tombstone trước để local cache cũ không hồi sinh lại, kể cả cloud đang lỗi.
-    list.forEach(c => markDeleted("customers", c.id));
-    setCustomers(p => p.filter(c => !list.some(x => x.id === c.id)));
-    const results = await Promise.allSettled(list.map(c => sbFetch("/customers?id=eq."+c.id, {method:"DELETE", prefer:""})));
-    const failed = results.filter(r => r.status === "rejected").length;
-    toast(failed ? `🧹 Đã ẩn ${list.length} khách phantom khỏi app. ${failed} khách chưa xoá được trên cloud nhưng sẽ không hồi sinh lại.` : `🧹 Đã dọn ${list.length} khách phantom!`);
+    await hardDeleteCustomers(list, "khách phantom");
+  };
+
+  // Dọn triệt để theo định nghĩa thực tế của shop: khách 0 lần = không có đơn và không có booking.
+  // Dùng khi app đã sinh khách phantom có tên/sđt nhìn như khách thật.
+  const cleanNoActivityCustomersNow = async (singleId = null) => {
+    const list = (singleId ? customers.filter(c => c.id === singleId) : customers)
+      .filter(c => !c.archived && !hasCustomerActivity(c, orders, bookings));
+    if (!list.length) { toast("✅ Không có khách 0 lần để dọn."); return; }
+    const preview = list.slice(0, 12).map(c => `${c.name || c.nick || c.social || c.id}${c.phone?` (${c.phone})`:""}`).join(", ");
+    const msg = singleId
+      ? `Xoá vĩnh viễn khách này?
+
+${preview}
+
+Khách không có đơn/booking nên sẽ không ảnh hưởng doanh thu.`
+      : `Dọn ${list.length} khách 0 lần / chưa có đơn-booking?
+
+${preview}${list.length>12?"...":""}
+
+Chỉ xoá khách KHÔNG có đơn và KHÔNG có booking. Không xoá khách đã từng phát sinh giao dịch.`;
+    if (!window.confirm(msg)) return;
+    if (!singleId && !window.confirm("Xác nhận lần 2: dọn toàn bộ khách 0 lần đang hiển thị?")) return;
+    await hardDeleteCustomers(list, "khách 0 lần");
   };
 
   const filtered = customers.filter(c=>{
@@ -1152,7 +1181,7 @@ Chỉ xoá khách KHÔNG có đơn, KHÔNG có booking, và thông tin trống/y
     if(tab==="vip"&&!isVip(c)) return false;
     if(tab==="fu"&&!needsFollowUp(c)) return false;
     if(tab==="new"&&!c.tags?.includes("new")) return false;
-    if(tab==="noorder"&&orders.some(o=>o.custId===c.id)) return false;
+    if(tab==="noorder"&&hasCustomerActivity(c, orders, bookings)) return false;
     if(search&&!c.name.toLowerCase().includes(search.toLowerCase())&&!c.nick?.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
@@ -1239,11 +1268,11 @@ Chỉ xoá khách KHÔNG có đơn, KHÔNG có booking, và thông tin trống/y
             {c.notes&&<div style={{marginTop:8,fontSize:13,color:T.muted}}>📝 {c.notes}</div>}
           </div>
 
-          {isClearlyPhantomCustomer(c, orders, bookings)&&(
+          {!hasCustomerActivity(c, orders, bookings)&&(
             <div className="action-card action-card-red" style={{marginBottom:14}}>
-              <div style={{fontWeight:800,marginBottom:6}}>🧹 Khách này giống khách phantom</div>
-              <div style={{fontSize:12,color:T.muted,marginBottom:8}}>Khách không có đơn/booking và thông tin trống/yếu/test. Có thể dọn ngay tại đây.</div>
-              <button className="xs xs-red" onClick={()=>cleanPhantomCustomersNow(c.id)}>Dọn khách này</button>
+              <div style={{fontWeight:800,marginBottom:6}}>🧹 Khách 0 lần / chưa có giao dịch</div>
+              <div style={{fontSize:12,color:T.muted,marginBottom:8}}>Khách này không có đơn và không có booking. Nếu là khách phantom, có thể xoá triệt để ngay tại đây.</div>
+              <button className="xs xs-red" onClick={()=>cleanNoActivityCustomersNow(c.id)}>Dọn khách này</button>
             </div>
           )}
 
@@ -1332,11 +1361,15 @@ Chỉ xoá khách KHÔNG có đơn, KHÔNG có booking, và thông tin trống/y
           </div>
         )}
 
-        {(phantomCustomers.length>0 || (tab==="noorder" && noActivityCustomers.length>0))&&(
+        {noActivityCustomers.length>0&&(
           <div className="action-card action-card-red" style={{marginBottom:10}}>
-            <div style={{fontWeight:700,marginBottom:6}}>🧹 {phantomCustomers.length>0?`Phát hiện ${phantomCustomers.length} khách phantom rõ ràng`:"Công cụ dọn khách phantom"}</div>
-            <div style={{fontSize:12,color:T.muted,marginBottom:8}}>Dọn khách không có đơn/booking và thông tin trống/yếu/test. Khách thật có thông tin rõ sẽ không bị xoá.</div>
-            <button className="xs xs-red" onClick={()=>cleanPhantomCustomersNow()}>Dọn khách phantom</button>
+            <div style={{fontWeight:700,marginBottom:6}}>🧹 Có {noActivityCustomers.length} khách 0 lần / chưa có giao dịch</div>
+            <div style={{fontSize:12,color:T.muted,marginBottom:8}}>Dọn triệt để các khách không có đơn và không có booking. Dành cho trường hợp app sinh khách phantom có tên/sđt nhìn như khách thật.</div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {phantomCustomers.length>0&&<button className="xs xs-red" onClick={()=>cleanPhantomCustomersNow()}>Dọn {phantomCustomers.length} phantom rõ</button>}
+              <button className="xs xs-red" onClick={()=>cleanNoActivityCustomersNow()}>Dọn tất cả khách 0 lần</button>
+              {tab!=="noorder"&&<button className="xs xs-yellow" onClick={()=>setTab("noorder")}>Xem trước</button>}
+            </div>
           </div>
         )}
 
@@ -3203,7 +3236,7 @@ const NAV_ITEMS = [
   {id:"settings", l:"Cài đặt",ico:()=>I.cog},
 ];
 
-const APP_VERSION = "v30-phantom-clean-notify-permission";
+const APP_VERSION = "v31-hard-phantom-clean";
 
 const DEFAULT_SHOP = {
   name:     "Mitchi The Mighty",
