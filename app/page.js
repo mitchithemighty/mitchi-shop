@@ -401,8 +401,20 @@ function parseBookingDateTimeMs(b) {
 function showLocalNotification(title, body, tag) {
   if (typeof window === "undefined" || !("Notification" in window)) return false;
   if (Notification.permission !== "granted") return false;
-  try { new Notification(title, { body, tag, icon:"/icon-192.png?v=26", badge:"/icon-192.png?v=26" }); return true; }
-  catch(e) { console.warn("Notification failed", e); return false; }
+  try {
+    new Notification(title, {
+      body,
+      tag,
+      icon:"/icon-192.png?v=26",
+      badge:"/icon-192.png?v=26",
+      requireInteraction:false,
+      silent:false,
+    });
+    return true;
+  } catch(e) {
+    console.warn("Notification failed", e);
+    return false;
+  }
 }
 
 // ── SEED DATA — intentionally empty, all data comes from Supabase ─────────────
@@ -1115,6 +1127,23 @@ function CustomersPage({customers, setCustomers, orders, setOrders, bookings, se
     toast("✅ Đã khôi phục khách!");
   };
 
+  const phantomCustomers = customers.filter(c => isClearlyPhantomCustomer(c, orders, bookings));
+  const cleanPhantomCustomersNow = async () => {
+    const list = customers.filter(c => isClearlyPhantomCustomer(c, orders, bookings));
+    if (!list.length) { toast("✅ Không còn khách phantom rõ ràng."); return; }
+    const preview = list.slice(0, 8).map(c => c.name || c.nick || c.social || c.id).join(", ");
+    if (!window.confirm(`Dọn ${list.length} khách phantom rõ ràng?\n${preview}${list.length>8?"...":""}\n\nChỉ xoá khách KHÔNG có đơn, KHÔNG có booking, và thông tin trống/yếu.`)) return;
+    try {
+      await Promise.all(list.map(c => sbFetch("/customers?id=eq."+c.id, {method:"DELETE", prefer:""})));
+      list.forEach(c => markDeleted("customers", c.id));
+      setCustomers(p => p.filter(c => !list.some(x => x.id === c.id)));
+      toast(`🧹 Đã dọn ${list.length} khách phantom!`);
+    } catch(e) {
+      console.error(e);
+      toast("⚠️ Chưa dọn được khách phantom trên cloud. Thử lại sau.");
+    }
+  };
+
   const filtered = customers.filter(c=>{
     if(tab==="archived") return c.archived===true;
     if(c.archived) return false; // ẩn khách lưu trữ khỏi các tab khác
@@ -1290,6 +1319,14 @@ function CustomersPage({customers, setCustomers, orders, setOrders, bookings, se
           <div className="action-card action-card-yellow" style={{marginBottom:10}}>
             <div style={{fontWeight:700,marginBottom:6}}>📌 {customers.filter(c=>needsFollowUp(c)).length} khách lâu chưa quay lại</div>
             <button className="xs xs-yellow" onClick={()=>setTab("fu")}>Xem danh sách</button>
+          </div>
+        )}
+
+        {phantomCustomers.length>0&&(
+          <div className="action-card action-card-red" style={{marginBottom:10}}>
+            <div style={{fontWeight:700,marginBottom:6}}>🧹 Phát hiện {phantomCustomers.length} khách phantom rõ ràng</div>
+            <div style={{fontSize:12,color:T.muted,marginBottom:8}}>Chỉ gồm khách không có đơn/booking và thông tin trống hoặc tên test/yếu.</div>
+            <button className="xs xs-red" onClick={cleanPhantomCustomersNow}>Dọn khách phantom</button>
           </div>
         )}
 
@@ -2533,8 +2570,16 @@ function NotifForm({shop, setShop, toast, onClose}) {
     else toast("⚠️ Chưa cấp quyền notification.");
   };
   const testNotify = () => {
-    const ok = showLocalNotification("🐸 Mitchi Booking", "Đây là thông báo thử. App cần đang mở/PWA đang chạy để nhắc đúng giờ.", "mitchi-test");
-    toast(ok ? "🔔 Đã gửi notification thử!" : "⚠️ Chưa gửi được. Hãy bấm cấp quyền trước.");
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      toast("⚠️ Trình duyệt này chưa hỗ trợ notification.");
+      return;
+    }
+    if (Notification.permission !== "granted") {
+      toast("⚠️ Chưa cấp quyền. Bấm Cấp quyền trước.");
+      return;
+    }
+    const ok = showLocalNotification("🐸 Mitchi Booking", "Thông báo thử từ Mitchi. Nếu thấy tin này là notification đã hoạt động.", "mitchi-test-"+Date.now());
+    toast(ok ? "🔔 Đã gửi notification thử!" : "ℹ️ Quyền đã granted nhưng trình duyệt không hiện popup thử. Hãy cài PWA/mở app gần đây; lịch hẹn vẫn được app kiểm tra khi đang mở.");
   };
   return(
     <div className="overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -2570,7 +2615,7 @@ function NotifForm({shop, setShop, toast, onClose}) {
             <input type="time" value={f.daily} onChange={e=>setF(p=>({...p,daily:e.target.value}))}/>
           </div>
           <div style={{fontSize:12,color:T.muted,lineHeight:1.6}}>
-            Quyền hiện tại: <strong>{perm}</strong>. Notification cục bộ chỉ hoạt động khi app/PWA đã được mở gần đây; chưa phải push notification server 24/7.
+            Quyền hiện tại: <strong>{perm}</strong>. Nếu quyền là <strong>granted</strong> thì đã cấp quyền thành công. Đây là notification cục bộ: app sẽ nhắc khi PWA/trình duyệt đang mở hoặc vừa được mở gần đây.
           </div>
           <div style={{display:"flex",gap:8,marginTop:10}}>
             <button className="xs xs-green" onClick={askPermission}>🔔 Cấp quyền</button>
@@ -3125,7 +3170,7 @@ const NAV_ITEMS = [
   {id:"settings", l:"Cài đặt",ico:()=>I.cog},
 ];
 
-const APP_VERSION = "v23-static-frog-icon";
+const APP_VERSION = "v29-phantom-notify-fix";
 
 const DEFAULT_SHOP = {
   name:     "Mitchi The Mighty",
@@ -3330,6 +3375,22 @@ function isDeleted(table, id) {
 }
 
 const isMeaningfulCustomer = c => !!String(c?.name || c?.nick || c?.phone || c?.social || "").trim();
+const isClearlyPhantomCustomer = (c, orders = [], bookings = []) => {
+  if (!c?.id) return false;
+  const hasOrder = (orders || []).some(o => o.custId === c.id);
+  const hasBooking = (bookings || []).some(b => b.custId === c.id);
+  if (hasOrder || hasBooking) return false;
+  const name = normText(c.name);
+  const nick = normText(c.nick);
+  const phone = normText(c.phone);
+  const social = normText(c.social);
+  const notes = normText(c.notes);
+  if (!name && !nick && !phone && !social && !notes) return true;
+  const weakNames = new Set(["khach", "khách", "khach moi", "khách mới", "new customer", "customer", "test", "tst", "undefined", "null", "-"]);
+  const onlyWeakName = weakNames.has(name) && !nick && !phone && !social && !notes;
+  const noNameOnlyWeakSocial = !name && !nick && !phone && !notes && weakNames.has(social);
+  return onlyWeakName || noNameOnlyWeakSocial;
+};
 const normText = v => String(v || "").trim().toLowerCase().replace(/\s+/g," ");
 const isAutoGeneratedReply = r => {
   const hash = normText(r?.hash);
